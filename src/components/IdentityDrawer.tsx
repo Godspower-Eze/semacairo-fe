@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { shortString } from 'starknet'
 import { Identity } from '@semaphore-protocol/identity'
 import type { StarknetWindowObject } from 'starknetkit'
+import { FIELD_PRIME } from '../config/constants'
 
 interface IdentityDrawerProps {
     isOpen: boolean
@@ -80,8 +81,8 @@ export const IdentityDrawer = ({ isOpen, onClose, chainId, signMessage, address 
             // Step 3: Create Semaphore Identity (v4)
             // Storing ONLY the commitment in state as requested
             const semaIdentity = new Identity(signatureSeed)
-
-            setIdentity(semaIdentity.commitment.toString())
+            const felt = semaIdentity.commitment % FIELD_PRIME;
+            setIdentity("0x" + felt.toString(16))
 
             setIsGenerating(false)
         } catch (err: any) {

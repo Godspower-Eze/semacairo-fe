@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import { connect, disconnect } from 'starknetkit'
 import type { TypedData } from 'starknet'
 import type { StarknetWindowObject } from 'starknetkit'

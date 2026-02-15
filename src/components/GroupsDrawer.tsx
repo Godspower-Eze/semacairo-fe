@@ -1,9 +1,10 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Users, Plus, UserPlus, Loader2, CheckCircle2, AlertCircle, ExternalLink } from 'lucide-react'
 import { useState } from 'react'
-import { Contract, uint256 } from 'starknet'
 import type { StarknetWindowObject } from 'starknetkit'
-import { SEMAPHORE_CONTRACT_ADDRESS, SEMAPHORE_ABI } from '../config/constants'
+import { cairo } from "starknet";
+
+import { SEMAPHORE_CONTRACT_ADDRESS } from '../config/constants'
 
 interface GroupsDrawerProps {
     isOpen: boolean
@@ -19,7 +20,7 @@ export const GroupsDrawer = ({ isOpen, onClose, wallet }: GroupsDrawerProps) => 
 
     // Form states
     const [groupId, setGroupId] = useState('')
-    const [depth, setDepth] = useState('20')
+    const depth = '20'
     const [identityCommitment, setIdentityCommitment] = useState('')
 
     const handleCreateGroup = async (e: React.FormEvent) => {
@@ -30,15 +31,25 @@ export const GroupsDrawer = ({ isOpen, onClose, wallet }: GroupsDrawerProps) => 
         setTxHash(null)
 
         try {
-            if (!wallet || !(wallet as any).account) {
+            if (!wallet) {
                 throw new Error("Wallet not connected")
             }
-            const contract = new Contract(SEMAPHORE_ABI, SEMAPHORE_CONTRACT_ADDRESS, (wallet as any).account)
 
-            // group_id is u256, depth is u8
-            const formattedGroupId = uint256.bnToUint256(groupId)
+            const gid = cairo.uint256(groupId);
 
-            const response = await contract.create_group(formattedGroupId, depth)
+            const response = await wallet.request({
+                type: 'wallet_addInvokeTransaction',
+                params: {
+                    "calls": [
+                        {
+                            "contract_address": SEMAPHORE_CONTRACT_ADDRESS,
+                            "entry_point": "create_group",
+                            "calldata": [gid.low.toString(), gid.high.toString(), depth]
+                        }
+                    ]
+                }
+            })
+
             setTxHash(response.transaction_hash)
 
             // Clear form
@@ -59,14 +70,25 @@ export const GroupsDrawer = ({ isOpen, onClose, wallet }: GroupsDrawerProps) => 
         setTxHash(null)
 
         try {
-            if (!wallet || !(wallet as any).account) {
+            if (!wallet) {
                 throw new Error("Wallet not connected")
             }
-            const contract = new Contract(SEMAPHORE_ABI, SEMAPHORE_CONTRACT_ADDRESS, (wallet as any).account)
 
-            const formattedGroupId = uint256.bnToUint256(groupId)
+            const gid = cairo.uint256(groupId);
 
-            const response = await contract.add_member(formattedGroupId, identityCommitment)
+            const response = await wallet.request({
+                type: 'wallet_addInvokeTransaction',
+                params: {
+                    "calls": [
+                        {
+                            "contract_address": SEMAPHORE_CONTRACT_ADDRESS,
+                            "entry_point": "add_member",
+                            "calldata": [gid.low.toString(), gid.high.toString(), identityCommitment]
+                        }
+                    ]
+                }
+            })
+
             setTxHash(response.transaction_hash)
 
             // Clear form (keeping group id might be useful for batch adding, but clearing for safety)
@@ -152,18 +174,15 @@ export const GroupsDrawer = ({ isOpen, onClose, wallet }: GroupsDrawerProps) => 
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <label className="text-[9px] font-black uppercase tracking-[0.2em] text-neutral-400">Tree Depth (8-32)</label>
+                                            <label className="text-[9px] font-black uppercase tracking-[0.2em] text-neutral-400">Tree Depth (Fixed)</label>
                                             <input
                                                 type="number"
                                                 value={depth}
-                                                onChange={(e) => setDepth(e.target.value)}
-                                                min="8"
-                                                max="32"
-                                                required
-                                                className="w-full px-4 py-3 bg-neutral-50 border border-neutral-100 rounded-xl text-xs font-bold focus:outline-none focus:border-black/20 focus:bg-white transition-all"
+                                                readOnly
+                                                className="w-full px-4 py-3 bg-neutral-100 border border-neutral-100 rounded-xl text-xs font-bold text-neutral-500 cursor-not-allowed focus:outline-none transition-all"
                                             />
                                             <p className="text-[9px] text-neutral-400 font-medium leading-relaxed italic">
-                                                Determines the maximum members (2^depth). Default is 20.
+                                                Standard depth for this deployment (2^20 members).
                                             </p>
                                         </div>
                                         <button
@@ -259,12 +278,12 @@ export const GroupsDrawer = ({ isOpen, onClose, wallet }: GroupsDrawerProps) => 
                                                 <code className="text-[10px] font-mono font-bold break-all text-neutral-300 line-clamp-1">{txHash}</code>
                                             </div>
                                             <a
-                                                href={`https://sepolia.starkscan.co/tx/${txHash}`}
+                                                href={`https://sepolia.voyager.online/tx/${txHash}`}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
                                                 className="flex items-center justify-center gap-2 w-full py-2 bg-white text-black rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-neutral-200 transition-colors"
                                             >
-                                                View on Starkscan
+                                                View on Voyager
                                                 <ExternalLink className="w-3 h-3" />
                                             </a>
                                         </div>
