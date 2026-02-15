@@ -4,11 +4,13 @@ import { Shield, ExternalLink, Menu, X, Lock, Fingerprint, Wallet, LogOut, Users
 import { useStarknet } from './hooks/useStarknet'
 import { IdentityDrawer } from './components/IdentityDrawer'
 import { GroupsDrawer } from './components/GroupsDrawer'
+import { ProofsDrawer } from './components/ProofsDrawer'
 
 function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isIdentityDrawerOpen, setIsIdentityDrawerOpen] = useState(false)
   const [isGroupsDrawerOpen, setIsGroupsDrawerOpen] = useState(false)
+  const [isProofsDrawerOpen, setIsProofsDrawerOpen] = useState(false)
   const { isConnected, address, chainId, signMessage, isConnecting, connectWallet, disconnectWallet, wallet } = useStarknet()
 
   const truncatedAddress = address
@@ -31,6 +33,13 @@ function App() {
       <GroupsDrawer
         isOpen={isGroupsDrawerOpen}
         onClose={() => setIsGroupsDrawerOpen(false)}
+        wallet={wallet}
+      />
+
+      {/* Proofs Drawer */}
+      <ProofsDrawer
+        isOpen={isProofsDrawerOpen}
+        onClose={() => setIsProofsDrawerOpen(false)}
         wallet={wallet}
       />
 
@@ -177,6 +186,7 @@ function App() {
               <div className="mt-auto flex flex-col gap-3 relative">
                 <button
                   disabled={!isConnected}
+                  onClick={() => setIsProofsDrawerOpen(true)}
                   className="bg-black text-white py-4 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-neutral-800 transition-colors cursor-pointer text-center shadow-lg shadow-black/10 disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                   Generate Proof
