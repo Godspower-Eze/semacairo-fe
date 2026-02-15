@@ -1,12 +1,12 @@
 import { useState, useCallback, useEffect } from 'react'
 import { connect, disconnect, getSelectedConnectorWallet } from 'starknetkit'
-import { AccountInterface } from 'starknet'
+import type { TypedData } from 'starknet'
+import type { StarknetWindowObject } from 'starknetkit'
 
 export const useStarknet = () => {
     const [address, setAddress] = useState<string | null>(null)
-    const [account, setAccount] = useState<AccountInterface | null>(null)
     const [chainId, setChainId] = useState<string | null>(null)
-    const [wallet, setWallet] = useState<any>(null)
+    const [wallet, setWallet] = useState<StarknetWindowObject | null>(null)
     const [isConnecting, setIsConnecting] = useState(false)
 
     const connectWallet = useCallback(async () => {
@@ -16,19 +16,14 @@ export const useStarknet = () => {
         try {
             const result = await connect({
                 modalMode: "canAsk",
-                modalTheme: "light"
+                modalTheme: "dark"
             })
 
-            setWallet(result.wallet)
+            setWallet(result.wallet ?? null)
 
             if (result.connectorData && result.connectorData.account) {
                 setAddress(result.connectorData.account)
-                setChainId(result.connectorData.chainId ? result.connectorData.chainId.toString() : null)
-            }
-
-            const connectedWallet = result.wallet as any
-            if (connectedWallet && connectedWallet.account) {
-                setAccount(connectedWallet.account)
+                setChainId(result.connectorData.chainId ? "0x" + result.connectorData.chainId.toString(16) : null)
             }
         } catch (error) {
             console.error('Failed to connect wallet:', error)
@@ -41,7 +36,6 @@ export const useStarknet = () => {
         try {
             await disconnect({ clearLastWallet: true })
             setAddress(null)
-            setAccount(null)
             setChainId(null)
             setWallet(null)
         } catch (error) {
@@ -49,51 +43,64 @@ export const useStarknet = () => {
         }
     }, [])
 
-    const signMessage = useCallback(async (typedData: any) => {
-        if (!account || !wallet) throw new Error("Wallet not connected")
-
-        // Strategy 1: Direct wallet request (Often more robust than library wrappers)
-        if (wallet.request) {
-            try {
-                return await wallet.request({
-                    type: "starknet_signTypedData",
-                    params: [typedData] // SNIP-12 standard (array wrapped)
-                })
-            } catch (e1: any) {
-                console.warn('wallet.request [typedData] failed, trying fallback...', e1)
-                try {
-                    return await wallet.request({
-                        type: "starknet_signTypedData",
-                        params: typedData // Legacy/Alternate parameter format
-                    })
-                } catch (e2: any) {
-                    console.warn('wallet.request raw failed...', e2)
-                }
-            }
-        }
-
-        // Strategy 2: account.signMessage (Library wrapper)
-        try {
-            return await account.signMessage(typedData)
-        } catch (e3: any) {
-            console.error('All signMessage strategies failed:', e3)
-            throw e3
-        }
-    }, [account, wallet])
+    const signMessage = useCallback(async (typedData: TypedData) => {
+        if (!wallet) throw new Error("Wallet not connected")
+        const signature = await wallet.request({ type: "wallet_signTypedData", params: typedData })
+        return signature
+    }, [wallet])
 
     useEffect(() => {
         const checkConnection = async () => {
-            const savedWallet = getSelectedConnectorWallet()
+            const savedWallet = await getSelectedConnectorWallet()
             if (savedWallet) {
-                // Silently reconnecting would happen here
+                setWallet(savedWallet)
+                // Cast to any to access properties that might be missing in strict type but present in object
+                const walletAny = savedWallet as any
+                if (walletAny.isConnected) {
+                    setAddress(walletAny.account ? walletAny.account.address : null)
+                    setChainId(walletAny.chainId ? "0x" + walletAny.chainId.toString(16) : null)
+                }
             }
         }
         checkConnection()
     }, [])
 
+    useEffect(() => {
+        if (wallet) {
+            const handleAccountsChanged = (accounts: string[] | undefined) => {
+                if (accounts && accounts.length > 0) {
+                    setAddress(accounts[0])
+                } else {
+                    setAddress(null)
+                }
+            }
+
+            const handleChainChanged = (chainId: string | undefined) => {
+                setChainId(chainId ? "0x" + parseInt(chainId).toString(16) : null)
+            }
+
+            try {
+                // Cast to any to avoid strict type mismatch with event handlers
+                (wallet as any).on('accountsChanged', handleAccountsChanged);
+                (wallet as any).on('networkChanged', handleChainChanged);
+            } catch (e) {
+                console.error("Failed to add event listeners", e)
+            }
+
+            return () => {
+                try {
+                    (wallet as any).off('accountsChanged', handleAccountsChanged);
+                    (wallet as any).off('networkChanged', handleChainChanged);
+                } catch (e) {
+                    console.error("Failed to remove event listeners", e)
+                }
+            }
+        }
+    }, [wallet])
+
     return {
         address,
-        account,
+        wallet,
         chainId,
         signMessage,
         isConnecting,

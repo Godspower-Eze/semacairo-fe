@@ -9,7 +9,7 @@ function App() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isIdentityDrawerOpen, setIsIdentityDrawerOpen] = useState(false)
   const [isGroupsDrawerOpen, setIsGroupsDrawerOpen] = useState(false)
-  const { isConnected, address, account, chainId, signMessage, isConnecting, connectWallet, disconnectWallet } = useStarknet()
+  const { isConnected, address, chainId, signMessage, isConnecting, connectWallet, disconnectWallet, wallet } = useStarknet()
 
   const truncatedAddress = address
     ? `${address.slice(0, 6)}...${address.slice(-4)}`
@@ -21,16 +21,17 @@ function App() {
       <IdentityDrawer
         isOpen={isIdentityDrawerOpen}
         onClose={() => setIsIdentityDrawerOpen(false)}
-        account={account}
         chainId={chainId}
         signMessage={signMessage}
+        wallet={wallet}
+        address={address}
       />
 
       {/* Groups Drawer */}
       <GroupsDrawer
         isOpen={isGroupsDrawerOpen}
         onClose={() => setIsGroupsDrawerOpen(false)}
-        account={account}
+        wallet={wallet}
       />
 
       {/* Navigation */}

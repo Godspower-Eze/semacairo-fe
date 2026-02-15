@@ -1,16 +1,17 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Users, Plus, UserPlus, Loader2, CheckCircle2, AlertCircle, ExternalLink } from 'lucide-react'
 import { useState } from 'react'
-import { AccountInterface, Contract, uint256 } from 'starknet'
+import { Contract, uint256 } from 'starknet'
+import type { StarknetWindowObject } from 'starknetkit'
 import { SEMAPHORE_CONTRACT_ADDRESS, SEMAPHORE_ABI } from '../config/constants'
 
 interface GroupsDrawerProps {
     isOpen: boolean
     onClose: () => void
-    account: AccountInterface | null
+    wallet: StarknetWindowObject | null
 }
 
-export const GroupsDrawer = ({ isOpen, onClose, account }: GroupsDrawerProps) => {
+export const GroupsDrawer = ({ isOpen, onClose, wallet }: GroupsDrawerProps) => {
     const [activeTab, setActiveTab] = useState<'create' | 'add'>('create')
     const [isLoading, setIsLoading] = useState(false)
     const [txHash, setTxHash] = useState<string | null>(null)
@@ -23,14 +24,16 @@ export const GroupsDrawer = ({ isOpen, onClose, account }: GroupsDrawerProps) =>
 
     const handleCreateGroup = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!account) return
 
         setIsLoading(true)
         setError(null)
         setTxHash(null)
 
         try {
-            const contract = new Contract(SEMAPHORE_ABI, SEMAPHORE_CONTRACT_ADDRESS, account)
+            if (!wallet || !(wallet as any).account) {
+                throw new Error("Wallet not connected")
+            }
+            const contract = new Contract(SEMAPHORE_ABI, SEMAPHORE_CONTRACT_ADDRESS, (wallet as any).account)
 
             // group_id is u256, depth is u8
             const formattedGroupId = uint256.bnToUint256(groupId)
@@ -50,14 +53,16 @@ export const GroupsDrawer = ({ isOpen, onClose, account }: GroupsDrawerProps) =>
 
     const handleAddMember = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!account) return
 
         setIsLoading(true)
         setError(null)
         setTxHash(null)
 
         try {
-            const contract = new Contract(SEMAPHORE_ABI, SEMAPHORE_CONTRACT_ADDRESS, account)
+            if (!wallet || !(wallet as any).account) {
+                throw new Error("Wallet not connected")
+            }
+            const contract = new Contract(SEMAPHORE_ABI, SEMAPHORE_CONTRACT_ADDRESS, (wallet as any).account)
 
             const formattedGroupId = uint256.bnToUint256(groupId)
 
@@ -163,7 +168,7 @@ export const GroupsDrawer = ({ isOpen, onClose, account }: GroupsDrawerProps) =>
                                         </div>
                                         <button
                                             type="submit"
-                                            disabled={isLoading || !account}
+                                            disabled={isLoading}
                                             className="w-full h-12 bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-neutral-800 transition-all disabled:bg-neutral-100 disabled:text-neutral-400 flex items-center justify-center gap-3 active:scale-[0.98]"
                                         >
                                             {isLoading ? (
@@ -202,7 +207,7 @@ export const GroupsDrawer = ({ isOpen, onClose, account }: GroupsDrawerProps) =>
                                         </div>
                                         <button
                                             type="submit"
-                                            disabled={isLoading || !account}
+                                            disabled={isLoading}
                                             className="w-full h-12 bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-neutral-800 transition-all disabled:bg-neutral-100 disabled:text-neutral-400 flex items-center justify-center gap-3 active:scale-[0.98]"
                                         >
                                             {isLoading ? (

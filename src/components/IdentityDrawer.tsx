@@ -1,28 +1,31 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Fingerprint, Copy, Check, ShieldAlert, Key, RefreshCw, PenTool } from 'lucide-react'
-import { useState } from 'react'
-import { AccountInterface, shortString } from 'starknet'
+import { useState, useEffect } from 'react'
+import { shortString } from 'starknet'
 import { Identity } from '@semaphore-protocol/identity'
+import type { StarknetWindowObject } from 'starknetkit'
 
 interface IdentityDrawerProps {
     isOpen: boolean
     onClose: () => void
-    account: AccountInterface | null
     chainId: string | null
     signMessage: (typedData: any) => Promise<any>
+    wallet: StarknetWindowObject | null
+    address: string | null
 }
 
-export const IdentityDrawer = ({ isOpen, onClose, account, chainId, signMessage }: IdentityDrawerProps) => {
+export const IdentityDrawer = ({ isOpen, onClose, chainId, signMessage, address }: IdentityDrawerProps) => {
     const [isCopied, setIsCopied] = useState(false)
     const [isGenerating, setIsGenerating] = useState(false)
-    const [identity, setIdentity] = useState<{ commitment: string } | null>(null)
+    const [identity, setIdentity] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
 
+    // Clear identity when address changes
+    useEffect(() => {
+        setIdentity(null)
+    }, [address])
+
     const handleGenerate = async () => {
-        if (!account) {
-            setError('Wallet not connected.')
-            return
-        }
 
         setIsGenerating(true)
         setError(null)
@@ -31,7 +34,7 @@ export const IdentityDrawer = ({ isOpen, onClose, account, chainId, signMessage 
         try {
             // High-compatibility TypedData (using felt for maximum wallet support)
             // Clean chainId (remove underscores which can confuse some parsers)
-            const cleanChainId = (chainId || "0x534e5345504f4c4941").replace(/_/g, '')
+            const cleanChainId = chainId
 
             const typedData = {
                 types: {
@@ -78,9 +81,7 @@ export const IdentityDrawer = ({ isOpen, onClose, account, chainId, signMessage 
             // Storing ONLY the commitment in state as requested
             const semaIdentity = new Identity(signatureSeed)
 
-            setIdentity({
-                commitment: semaIdentity.commitment.toString()
-            })
+            setIdentity(semaIdentity.commitment.toString())
 
             setIsGenerating(false)
         } catch (err: any) {
@@ -156,7 +157,7 @@ export const IdentityDrawer = ({ isOpen, onClose, account, chainId, signMessage 
                                     <div className="space-y-4">
                                         <button
                                             onClick={handleGenerate}
-                                            disabled={isGenerating || !account}
+                                            disabled={isGenerating}
                                             className="w-full bg-black text-white py-8 flex flex-col items-center justify-center gap-4 group hover:bg-neutral-800 transition-all cursor-pointer relative overflow-hidden"
                                         >
                                             {isGenerating ? (
@@ -180,8 +181,8 @@ export const IdentityDrawer = ({ isOpen, onClose, account, chainId, signMessage 
                                                     This is your public identity. It can be shared and added to privacy groups.
                                                 </p>
                                                 <div className="flex items-center justify-between gap-4 bg-white p-3 border border-neutral-100">
-                                                    <code className="text-[10px] font-mono font-bold break-all text-black line-clamp-2">{identity.commitment}</code>
-                                                    <button onClick={() => copyToClipboard(identity.commitment)} className="p-2 hover:bg-neutral-50 transition-all cursor-pointer shrink-0">
+                                                    <code className="text-[10px] font-mono font-bold break-all text-black line-clamp-2">{identity}</code>
+                                                    <button onClick={() => copyToClipboard(identity)} className="p-2 hover:bg-neutral-50 transition-all cursor-pointer shrink-0">
                                                         {isCopied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
                                                     </button>
                                                 </div>
