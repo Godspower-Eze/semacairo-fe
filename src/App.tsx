@@ -1,17 +1,22 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Shield, ExternalLink, Menu, X, Lock, Fingerprint, Wallet, LogOut, Users, Search } from 'lucide-react'
+import { Shield, ExternalLink, Menu, X, Lock, Fingerprint, Wallet, LogOut, Users, Search, AlertTriangle } from 'lucide-react'
+import { Identity } from '@semaphore-protocol/identity'
 import { useStarknet } from './hooks/useStarknet'
 import { IdentityDrawer } from './components/IdentityDrawer'
 import { GroupsDrawer } from './components/GroupsDrawer'
 import { ProofsDrawer } from './components/ProofsDrawer'
 
 function App() {
+  const [identity, setIdentity] = useState<Identity | null>(null)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isIdentityDrawerOpen, setIsIdentityDrawerOpen] = useState(false)
   const [isGroupsDrawerOpen, setIsGroupsDrawerOpen] = useState(false)
   const [isProofsDrawerOpen, setIsProofsDrawerOpen] = useState(false)
-  const { isConnected, address, chainId, signMessage, isConnecting, connectWallet, disconnectWallet, wallet } = useStarknet()
+  const { isConnected, address, chainId, signMessage, isConnecting, connectWallet, disconnectWallet, wallet, isSepolia, switchToSepolia } = useStarknet()
+
+  // Actions are only allowed when connected AND on Sepolia
+  const isReady = isConnected && isSepolia
 
   const truncatedAddress = address
     ? `${address.slice(0, 6)}...${address.slice(-4)}`
@@ -19,6 +24,23 @@ function App() {
 
   return (
     <div className="min-h-screen bg-white text-black selection:bg-black/5">
+      {/* Network Guard Banner */}
+      {isConnected && !isSepolia && (
+        <div className="fixed top-0 left-0 right-0 z-[100] bg-amber-50 border-b border-amber-200">
+          <div className="max-w-7xl mx-auto px-6 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="w-4 h-4 text-amber-600" />
+              <span className="text-xs font-bold text-amber-800 uppercase tracking-wider">Wrong Network — Switch to Starknet Sepolia to continue</span>
+            </div>
+            <button
+              onClick={switchToSepolia}
+              className="px-4 py-1.5 bg-amber-600 text-white text-[10px] font-black uppercase tracking-widest rounded hover:bg-amber-700 transition-colors"
+            >
+              Switch Network
+            </button>
+          </div>
+        </div>
+      )}
       {/* Identity Drawer */}
       <IdentityDrawer
         isOpen={isIdentityDrawerOpen}
@@ -27,6 +49,8 @@ function App() {
         signMessage={signMessage}
         wallet={wallet}
         address={address}
+        identity={identity}
+        setIdentity={setIdentity}
       />
 
       {/* Groups Drawer */}
@@ -34,6 +58,11 @@ function App() {
         isOpen={isGroupsDrawerOpen}
         onClose={() => setIsGroupsDrawerOpen(false)}
         wallet={wallet}
+        identity={identity}
+        onOpenIdentity={() => {
+          setIsGroupsDrawerOpen(false)
+          setIsIdentityDrawerOpen(true)
+        }}
       />
 
       {/* Proofs Drawer */}
@@ -41,6 +70,11 @@ function App() {
         isOpen={isProofsDrawerOpen}
         onClose={() => setIsProofsDrawerOpen(false)}
         wallet={wallet}
+        identity={identity}
+        onOpenIdentity={() => {
+          setIsProofsDrawerOpen(false)
+          setIsIdentityDrawerOpen(true)
+        }}
       />
 
       {/* Navigation */}
@@ -115,13 +149,13 @@ function App() {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             {/* Identity Module */}
-            <section className={`group border border-neutral-100 p-10 flex flex-col hover:border-black hover:bg-neutral-50 hover:shadow-2xl hover:shadow-black/5 transition-all duration-500 relative overflow-hidden cursor-default ${!isConnected ? 'opacity-50' : ''}`}>
+            <section className={`group border border-neutral-100 p-10 flex flex-col hover:border-black hover:bg-neutral-50 hover:shadow-2xl hover:shadow-black/5 transition-all duration-500 relative overflow-hidden cursor-default ${!isReady ? 'opacity-50' : ''}`}>
               <div className="absolute top-0 right-0 w-32 h-32 bg-neutral-100/50 translate-x-16 -translate-y-16 rotate-45 transition-transform group-hover:bg-black/5 group-hover:translate-x-12 group-hover:-translate-y-12" />
               <div className="flex items-center justify-between mb-10 relative">
                 <div className="p-4 bg-white border border-neutral-100 shadow-sm group-hover:border-black group-hover:rotate-3 transition-all">
                   <Fingerprint className="w-6 h-6" />
                 </div>
-                {!isConnected && <span className="text-[9px] font-bold uppercase tracking-widest text-neutral-400">Locked</span>}
+                {!isReady && <span className="text-[9px] font-bold uppercase tracking-widest text-neutral-400">Locked</span>}
                 <span className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-200 group-hover:text-black transition-colors">ROOT_01</span>
               </div>
               <h3 className="text-2xl font-bold uppercase mb-4 tracking-tight">Identity</h3>
@@ -131,7 +165,7 @@ function App() {
               <div className="mt-auto flex flex-col gap-3 relative">
                 <button
                   onClick={() => setIsIdentityDrawerOpen(true)}
-                  disabled={!isConnected}
+                  disabled={!isReady}
                   className="bg-black text-white py-4 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-neutral-800 transition-colors cursor-pointer shadow-lg shadow-black/10 disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                   {isConnected ? 'Manage Identity' : 'Connect Wallet to Access'}
@@ -140,7 +174,7 @@ function App() {
             </section>
 
             {/* Groups Module */}
-            <section className={`group border border-neutral-100 p-10 flex flex-col hover:border-black hover:bg-neutral-50 hover:shadow-2xl hover:shadow-black/5 transition-all duration-500 relative overflow-hidden cursor-default ${!isConnected ? 'opacity-50' : ''}`}>
+            <section className={`group border border-neutral-100 p-10 flex flex-col hover:border-black hover:bg-neutral-50 hover:shadow-2xl hover:shadow-black/5 transition-all duration-500 relative overflow-hidden cursor-default ${!isReady ? 'opacity-50' : ''}`}>
               <div className="absolute top-0 right-0 w-32 h-32 bg-neutral-100/50 translate-x-16 -translate-y-16 rotate-45 transition-transform group-hover:bg-black/5 group-hover:translate-x-12 group-hover:-translate-y-12" />
               <div className="flex items-center justify-between mb-10 relative">
                 <div className="p-4 bg-white border border-neutral-100 shadow-sm group-hover:border-black group-hover:-rotate-3 transition-all">
@@ -154,14 +188,14 @@ function App() {
               </p>
               <div className="mt-auto flex flex-col gap-3 relative">
                 <button
-                  disabled={!isConnected}
+                  disabled={!isReady}
                   onClick={() => setIsGroupsDrawerOpen(true)}
                   className="bg-black text-white py-4 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-neutral-800 transition-colors cursor-pointer shadow-lg shadow-black/10 disabled:opacity-30 disabled:cursor-not-allowed text-center"
                 >
                   Create Group
                 </button>
                 <button
-                  disabled={!isConnected}
+                  disabled={!isReady}
                   onClick={() => setIsGroupsDrawerOpen(true)}
                   className="border border-neutral-200 py-4 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-white hover:border-black transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed text-center"
                 >
@@ -170,29 +204,30 @@ function App() {
               </div>
             </section>
 
-            {/* Proofs Module */}
-            <section className={`group border border-neutral-100 p-10 flex flex-col hover:border-black hover:bg-neutral-50 hover:shadow-2xl hover:shadow-black/5 transition-all duration-500 relative overflow-hidden cursor-default ${!isConnected ? 'opacity-50' : ''}`}>
+            {/* Messages Module */}
+            <section className={`group border border-neutral-100 p-10 flex flex-col hover:border-black hover:bg-neutral-50 hover:shadow-2xl hover:shadow-black/5 transition-all duration-500 relative overflow-hidden cursor-default ${!isReady ? 'opacity-50' : ''}`}>
               <div className="absolute top-0 right-0 w-32 h-32 bg-neutral-100/50 translate-x-16 -translate-y-16 rotate-45 transition-transform group-hover:bg-black/5 group-hover:translate-x-12 group-hover:-translate-y-12" />
               <div className="flex items-center justify-between mb-10 relative">
                 <div className="p-4 bg-white border border-neutral-100 shadow-sm group-hover:border-black group-hover:rotate-6 transition-all">
                   <Lock className="w-6 h-6" />
                 </div>
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-200 group-hover:text-black transition-colors">PROOF_03</span>
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-200 group-hover:text-black transition-colors">MSG_03</span>
               </div>
-              <h3 className="text-2xl font-bold uppercase mb-4 tracking-tight">Proofs</h3>
+              <h3 className="text-2xl font-bold uppercase mb-4 tracking-tight">Messages</h3>
               <p className="text-sm text-neutral-500 mb-10 leading-relaxed font-medium">
-                Construct and verify zero-knowledge proofs to broadcast signals without revealing your identity.
+                Send anonymous messages with zero-knowledge guarantees and optionally verify the proof payload.
               </p>
               <div className="mt-auto flex flex-col gap-3 relative">
                 <button
-                  disabled={!isConnected}
+                  disabled={!isReady}
                   onClick={() => setIsProofsDrawerOpen(true)}
                   className="bg-black text-white py-4 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-neutral-800 transition-colors cursor-pointer text-center shadow-lg shadow-black/10 disabled:opacity-30 disabled:cursor-not-allowed"
                 >
-                  Generate Proof
+                  Send message
                 </button>
                 <button
-                  disabled={!isConnected}
+                  disabled={!isReady}
+                  onClick={() => setIsProofsDrawerOpen(true)}
                   className="border border-neutral-200 py-4 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-white hover:border-black transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                   Verify Proof

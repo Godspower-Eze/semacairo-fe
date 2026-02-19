@@ -6,13 +6,17 @@ import { cairo } from "starknet";
 
 import { SEMAPHORE_CONTRACT_ADDRESS } from '../config/constants'
 
+import { Identity } from '@semaphore-protocol/identity'
+
 interface GroupsDrawerProps {
     isOpen: boolean
     onClose: () => void
     wallet: StarknetWindowObject | null
+    identity: Identity | null
+    onOpenIdentity: () => void
 }
 
-export const GroupsDrawer = ({ isOpen, onClose, wallet }: GroupsDrawerProps) => {
+export const GroupsDrawer = ({ isOpen, onClose, wallet, identity, onOpenIdentity }: GroupsDrawerProps) => {
     const [activeTab, setActiveTab] = useState<'create' | 'add'>('create')
     const [isLoading, setIsLoading] = useState(false)
     const [txHash, setTxHash] = useState<string | null>(null)
@@ -20,8 +24,13 @@ export const GroupsDrawer = ({ isOpen, onClose, wallet }: GroupsDrawerProps) => 
 
     // Form states
     const [groupId, setGroupId] = useState('')
-    const depth = '20'
+    const [depth, setDepth] = useState('20')
     const [identityCommitment, setIdentityCommitment] = useState('')
+
+    // Derive commitment for active identity
+    const activeIdentityCommitment = identity
+        ? "0x" + (identity.commitment).toString(16)
+        : null
 
     const handleCreateGroup = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -75,6 +84,7 @@ export const GroupsDrawer = ({ isOpen, onClose, wallet }: GroupsDrawerProps) => 
             }
 
             const gid = cairo.uint256(groupId);
+            const identityCommitmentUint256 = cairo.uint256(identityCommitment);
 
             const response = await wallet.request({
                 type: 'wallet_addInvokeTransaction',
@@ -83,7 +93,7 @@ export const GroupsDrawer = ({ isOpen, onClose, wallet }: GroupsDrawerProps) => 
                         {
                             "contract_address": SEMAPHORE_CONTRACT_ADDRESS,
                             "entry_point": "add_member",
-                            "calldata": [gid.low.toString(), gid.high.toString(), identityCommitment]
+                            "calldata": [gid.low.toString(), gid.high.toString(), identityCommitmentUint256.low.toString(), identityCommitmentUint256.high.toString()]
                         }
                     ]
                 }
@@ -174,15 +184,17 @@ export const GroupsDrawer = ({ isOpen, onClose, wallet }: GroupsDrawerProps) => 
                                             />
                                         </div>
                                         <div className="space-y-2">
-                                            <label className="text-[9px] font-black uppercase tracking-[0.2em] text-neutral-400">Tree Depth (Fixed)</label>
+                                            <label className="text-[9px] font-black uppercase tracking-[0.2em] text-neutral-400">Tree Depth</label>
                                             <input
                                                 type="number"
                                                 value={depth}
-                                                readOnly
-                                                className="w-full px-4 py-3 bg-neutral-100 border border-neutral-100 rounded-xl text-xs font-bold text-neutral-500 cursor-not-allowed focus:outline-none transition-all"
+                                                onChange={(e) => setDepth(e.target.value)}
+                                                placeholder="e.g. 20"
+                                                required
+                                                className="w-full px-4 py-3 bg-neutral-50 border border-neutral-100 rounded-xl text-xs font-bold focus:outline-none focus:border-black/20 focus:bg-white transition-all"
                                             />
                                             <p className="text-[9px] text-neutral-400 font-medium leading-relaxed italic">
-                                                Standard depth for this deployment (2^20 members).
+                                                Standard depth is 20 (2^20 members). Max recommended is 32.
                                             </p>
                                         </div>
                                         <button
@@ -213,16 +225,59 @@ export const GroupsDrawer = ({ isOpen, onClose, wallet }: GroupsDrawerProps) => 
                                                 className="w-full px-4 py-3 bg-neutral-50 border border-neutral-100 rounded-xl text-xs font-bold focus:outline-none focus:border-black/20 focus:bg-white transition-all"
                                             />
                                         </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[9px] font-black uppercase tracking-[0.2em] text-neutral-400">Identity Commitment (Public)</label>
-                                            <textarea
-                                                value={identityCommitment}
-                                                onChange={(e) => setIdentityCommitment(e.target.value)}
-                                                placeholder="0x..."
-                                                required
-                                                rows={3}
-                                                className="w-full px-4 py-3 bg-neutral-50 border border-neutral-100 rounded-xl text-xs font-mono font-bold focus:outline-none focus:border-black/20 focus:bg-white transition-all resize-none"
-                                            />
+                                        <div className="space-y-4">
+                                            <div className="space-y-2">
+                                                <label className="text-[9px] font-black uppercase tracking-[0.2em] text-neutral-400">Identity Commitment (Public)</label>
+
+                                                {/* Identity Selection Options */}
+                                                <div className="grid grid-cols-1 gap-2 mb-4">
+                                                    {activeIdentityCommitment ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setIdentityCommitment(activeIdentityCommitment)}
+                                                            className={`p-4 border text-left transition-all rounded-xl ${identityCommitment === activeIdentityCommitment
+                                                                ? 'border-black bg-neutral-50'
+                                                                : 'border-neutral-100 hover:border-neutral-300'
+                                                                }`}
+                                                        >
+                                                            <div className="flex items-center justify-between mb-1">
+                                                                <span className="text-[8px] font-black uppercase tracking-widest">Active Identity</span>
+                                                                {identityCommitment === activeIdentityCommitment && <div className="w-1.5 h-1.5 rounded-full bg-black" />}
+                                                            </div>
+                                                            <code className="text-[10px] font-mono font-bold block truncate">{activeIdentityCommitment}</code>
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            type="button"
+                                                            onClick={onOpenIdentity}
+                                                            className="p-4 border border-dashed border-neutral-200 text-center hover:border-black transition-all rounded-xl group"
+                                                        >
+                                                            <span className="text-[9px] font-black uppercase tracking-widest text-neutral-400 group-hover:text-black">No Active Identity — Create One</span>
+                                                        </button>
+                                                    )}
+                                                </div>
+
+                                                {/* Manual Input Fallback */}
+                                                <div className="relative">
+                                                    <textarea
+                                                        value={identityCommitment}
+                                                        onChange={(e) => setIdentityCommitment(e.target.value)}
+                                                        placeholder="Or paste commitment: 0x..."
+                                                        required
+                                                        rows={2}
+                                                        className="w-full px-4 py-3 bg-neutral-50 border border-neutral-100 rounded-xl text-xs font-mono font-bold focus:outline-none focus:border-black/20 focus:bg-white transition-all resize-none"
+                                                    />
+                                                    {identityCommitment && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setIdentityCommitment('')}
+                                                            className="absolute top-2 right-2 p-1 hover:bg-neutral-200 rounded-full transition-colors"
+                                                        >
+                                                            <X className="w-3 h-3 text-neutral-400" />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
                                         </div>
                                         <button
                                             type="submit"
