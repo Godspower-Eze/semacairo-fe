@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { shortString } from 'starknet'
 import { Identity } from '@semaphore-protocol/identity'
 import type { StarknetWindowObject } from 'starknetkit'
-import { FIELD_PRIME } from '../config/constants'
+
 
 interface IdentityDrawerProps {
     isOpen: boolean
@@ -13,18 +13,19 @@ interface IdentityDrawerProps {
     signMessage: (typedData: any) => Promise<any>
     wallet: StarknetWindowObject | null
     address: string | null
+    identity: Identity | null
+    setIdentity: (identity: Identity | null) => void
 }
 
-export const IdentityDrawer = ({ isOpen, onClose, chainId, signMessage, address }: IdentityDrawerProps) => {
+export const IdentityDrawer = ({ isOpen, onClose, chainId, signMessage, address, identity, setIdentity }: IdentityDrawerProps) => {
     const [isCopied, setIsCopied] = useState(false)
     const [isGenerating, setIsGenerating] = useState(false)
-    const [identity, setIdentity] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
 
     // Clear identity when address changes
     useEffect(() => {
         setIdentity(null)
-    }, [address])
+    }, [address, setIdentity])
 
     const handleGenerate = async () => {
 
@@ -79,10 +80,9 @@ export const IdentityDrawer = ({ isOpen, onClose, chainId, signMessage, address 
                     : String(signature)
 
             // Step 3: Create Semaphore Identity (v4)
-            // Storing ONLY the commitment in state as requested
+            // Storing the FULL Identity object in global state
             const semaIdentity = new Identity(signatureSeed)
-            const felt = semaIdentity.commitment % FIELD_PRIME;
-            setIdentity("0x" + felt.toString(16))
+            setIdentity(semaIdentity)
 
             setIsGenerating(false)
         } catch (err: any) {
@@ -97,6 +97,11 @@ export const IdentityDrawer = ({ isOpen, onClose, chainId, signMessage, address 
         setIsCopied(true)
         setTimeout(() => setIsCopied(false), 2000)
     }
+
+    // Derive commitment string for UI
+    const identityCommitment = identity
+        ? "0x" + (identity.commitment).toString(16)
+        : null
 
     return (
         <AnimatePresence>
@@ -154,7 +159,7 @@ export const IdentityDrawer = ({ isOpen, onClose, chainId, signMessage, address 
                             <section className="space-y-6">
                                 <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-400 mb-6">Initialization</h3>
 
-                                {!identity ? (
+                                {!identityCommitment ? (
                                     <div className="space-y-4">
                                         <button
                                             onClick={handleGenerate}
@@ -182,8 +187,8 @@ export const IdentityDrawer = ({ isOpen, onClose, chainId, signMessage, address 
                                                     This is your public identity. It can be shared and added to privacy groups.
                                                 </p>
                                                 <div className="flex items-center justify-between gap-4 bg-white p-3 border border-neutral-100">
-                                                    <code className="text-[10px] font-mono font-bold break-all text-black line-clamp-2">{identity}</code>
-                                                    <button onClick={() => copyToClipboard(identity)} className="p-2 hover:bg-neutral-50 transition-all cursor-pointer shrink-0">
+                                                    <code className="text-[10px] font-mono font-bold break-all text-black line-clamp-2">{identityCommitment}</code>
+                                                    <button onClick={() => copyToClipboard(identityCommitment)} className="p-2 hover:bg-neutral-50 transition-all cursor-pointer shrink-0">
                                                         {isCopied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
                                                     </button>
                                                 </div>
