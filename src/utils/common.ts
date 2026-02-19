@@ -46,7 +46,7 @@ export async function generateCalldata(
     packedProof: PackedGroth16Proof,
     publicInputs: bigint[],
     depth: number
-) {
+): Promise<string[]> {
     await garaga.init();
     const snarksProof = unpackGroth16Proof(packedProof);
     const proof = parseGroth16ProofFromObject(snarksProof, publicInputs);
@@ -58,8 +58,10 @@ export async function generateCalldata(
         IC: semaphoreVkData.IC[depth - 1]
     }
     const vk = parseGroth16VerifyingKeyFromObject(verificationKey);
+    console.log(vk)
 
-    return garaga.getGroth16CallData(proof, vk, proof.a.curveId);
+    const result = garaga.getGroth16CallData(proof, vk, 0);
+    return result.map((x: bigint) => x.toString());
 }
 
 export async function fetchGroupMembers(groupId: string): Promise<bigint[]> {

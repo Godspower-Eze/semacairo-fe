@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence, m } from 'framer-motion'
 import { X, Loader2, CheckCircle2, AlertCircle, ExternalLink, Shield, Send, BadgeCheck, Copy } from 'lucide-react'
 import { useState } from 'react'
 import type { StarknetWindowObject } from 'starknetkit'
@@ -46,7 +46,7 @@ export const ProofsDrawer = ({ isOpen, onClose, wallet, identity, onOpenIdentity
     // Form states
     const [groupId, setGroupId] = useState('')
     const [scope, setScope] = useState('')
-    const [signal, setSignal] = useState('')
+    const [message, setMessage] = useState('')
     const [verifyMerkleTreeDepth, setVerifyMerkleTreeDepth] = useState('20')
     const [verifyMerkleTreeRoot, setVerifyMerkleTreeRoot] = useState('')
     const [verifyNullifier, setVerifyNullifier] = useState('')
@@ -90,12 +90,11 @@ export const ProofsDrawer = ({ isOpen, onClose, wallet, identity, onOpenIdentity
             setStatus(`Found ${members.length} member(s). Sealing message...`)
 
             const depth = await getGroupDepth(groupId)
-            console.log(depth)
 
             const fullProof = await generateProof(
                 identity,
                 group,
-                signal,
+                message,
                 scope,
                 depth
             )
@@ -104,7 +103,7 @@ export const ProofsDrawer = ({ isOpen, onClose, wallet, identity, onOpenIdentity
                 BigInt(fullProof.merkleTreeRoot),
                 BigInt(fullProof.nullifier),
                 BigInt(keccakHash(fullProof.message)),
-                BigInt(keccakHash(fullProof.scope))
+                BigInt(keccakHash(fullProof.scope)),
             ];
 
             const calldata = await generateCalldata(
@@ -112,7 +111,6 @@ export const ProofsDrawer = ({ isOpen, onClose, wallet, identity, onOpenIdentity
                 publicInputs,
                 depth
             )
-            console.log(calldata)
 
             setGeneratedProof(fullProof)
             setStatus('Message prepared. Submitting transaction...')
@@ -135,19 +133,19 @@ export const ProofsDrawer = ({ isOpen, onClose, wallet, identity, onOpenIdentity
                                 gid.high.toString(),
                                 merkleTreeRootUint256.low.toString(),
                                 merkleTreeRootUint256.high.toString(),
-                                messageUint256.low.toString(),
-                                messageUint256.high.toString(),
                                 nullifierUint256.low.toString(),
                                 nullifierUint256.high.toString(),
+                                messageUint256.low.toString(),
+                                messageUint256.high.toString(),
                                 scopeUint256.low.toString(),
                                 scopeUint256.high.toString(),
-                                ...calldata.map((x) => x.toString())
+                                ...calldata
                             ]
                         }
                     ]
                 }
             })
-            setTxHash("0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef")
+            setTxHash(response.transaction_hash)
             setStatus('')
 
         } catch (err: any) {
@@ -280,7 +278,6 @@ export const ProofsDrawer = ({ isOpen, onClose, wallet, identity, onOpenIdentity
                     BigInt(keccakHash(proofToVerify.message)),
                     BigInt(keccakHash(proofToVerify.scope))
                 ]
-                console.log(proofToVerify.merkleTreeRoot, proofToVerify.nullifier,BigInt(keccakHash(proofToVerify.message)),BigInt(keccakHash(proofToVerify.scope)))
 
             const calldata = await generateCalldata(
                 proofToVerify.points,
@@ -294,6 +291,9 @@ export const ProofsDrawer = ({ isOpen, onClose, wallet, identity, onOpenIdentity
             const messageUint256 = cairo.uint256(keccakHash(proofToVerify.message));
             const scopeUint256 = cairo.uint256(keccakHash(proofToVerify.scope));
 
+            const verificationStatus = await verifyProof(proofToVerify)
+            console.log(verificationStatus)
+
             const response = await wallet.request({
                 type: 'wallet_addInvokeTransaction',
                 params: {
@@ -306,13 +306,13 @@ export const ProofsDrawer = ({ isOpen, onClose, wallet, identity, onOpenIdentity
                                 gid.high.toString(),
                                 merkleTreeRootUint256.low.toString(),
                                 merkleTreeRootUint256.high.toString(),
-                                messageUint256.low.toString(),
-                                messageUint256.high.toString(),
                                 nullifierUint256.low.toString(),
                                 nullifierUint256.high.toString(),
+                                messageUint256.low.toString(),
+                                messageUint256.high.toString(),
                                 scopeUint256.low.toString(),
                                 scopeUint256.high.toString(),
-                                ...calldata.map((x) => x.toString())
+                                ...calldata
                             ]
                         }
                     ]
@@ -512,8 +512,8 @@ export const ProofsDrawer = ({ isOpen, onClose, wallet, identity, onOpenIdentity
                                             <label className="text-[9px] font-black uppercase tracking-[0.2em] text-neutral-400">Message</label>
                                             <input
                                                 type="text"
-                                                value={signal}
-                                                onChange={(e) => setSignal(e.target.value)}
+                                                value={message}
+                                                onChange={(e) => setMessage(e.target.value)}
                                                 placeholder="e.g. Hello world or 1"
                                                 required
                                                 className="w-full px-4 py-3 bg-neutral-50 border border-neutral-100 rounded-xl text-xs font-bold focus:outline-none focus:border-black/20 focus:bg-white transition-all"
