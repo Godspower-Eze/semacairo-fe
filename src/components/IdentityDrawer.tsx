@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Fingerprint, Copy, Check, ShieldAlert, Key, RefreshCw, PenTool } from 'lucide-react'
+import { X, Fingerprint, Copy, Check, ShieldAlert, RefreshCw, PenTool } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { shortString } from 'starknet'
 import { Identity } from '@semaphore-protocol/identity'
@@ -149,7 +149,7 @@ export const IdentityDrawer = ({ isOpen, onClose, chainId, signMessage, address,
                                     <div className="flex gap-4">
                                         <ShieldAlert className="w-5 h-5 text-black shrink-0" />
                                         <p className="text-sm leading-relaxed text-neutral-600">
-                                            Your identity root is derived from your wallet signature. This ensures your privacy profile is unique and owned by you.
+                                            Your identity root is deterministically derived from your wallet signature. This means your privacy profile is permanently attached to your account and cannot be lost as long as you control your wallet.
                                         </p>
                                     </div>
                                 </div>
@@ -176,7 +176,7 @@ export const IdentityDrawer = ({ isOpen, onClose, chainId, signMessage, address,
                                                 <span className="text-[10px] text-neutral-400 mt-1 uppercase tracking-widest">Sign to derive ZK root</span>
                                             </div>
                                         </button>
-                                        {error && <p className="text-[10px] text-red-500 font-bold uppercase text-center">{error}</p>}
+                                        {error && <p className="text-[10px] text-red-500 font-bold uppercase text-center mt-4">{error}</p>}
                                     </div>
                                 ) : (
                                     <div className="space-y-4">
@@ -184,38 +184,18 @@ export const IdentityDrawer = ({ isOpen, onClose, chainId, signMessage, address,
                                             <div className="space-y-2">
                                                 <label className="text-[9px] font-black uppercase tracking-[0.2em] text-neutral-400">Identity Commitment</label>
                                                 <p className="text-[9px] text-neutral-400 uppercase font-bold leading-tight mb-2">
-                                                    This is your public identity. It can be shared and added to privacy groups.
+                                                    This is your deterministic public identity. It can be shared and added to privacy groups.
                                                 </p>
                                                 <div className="flex items-center justify-between gap-4 bg-white p-3 border border-neutral-100">
                                                     <code className="text-[10px] font-mono font-bold break-all text-black line-clamp-2">{identityCommitment}</code>
-                                                    <button onClick={() => copyToClipboard(identityCommitment)} className="p-2 hover:bg-neutral-50 transition-all cursor-pointer shrink-0">
+                                                    <button onClick={() => copyToClipboard(identityCommitment!)} className="p-2 hover:bg-neutral-50 transition-all cursor-pointer shrink-0">
                                                         {isCopied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
                                                     </button>
                                                 </div>
                                             </div>
                                         </div>
-
-                                        <button
-                                            onClick={() => setIdentity(null)}
-                                            className="w-full py-4 text-[10px] font-bold uppercase tracking-[0.2em] border border-neutral-100 hover:border-black transition-all cursor-pointer"
-                                        >
-                                            Generate New Identity
-                                        </button>
                                     </div>
                                 )}
-                            </section>
-
-                            {/* Stats/Persistence Section */}
-                            <section>
-                                <div className="border border-neutral-100 p-8 flex items-center gap-6">
-                                    <div className="p-3 bg-neutral-50 rounded-full">
-                                        <Key className="w-5 h-5 text-neutral-300" />
-                                    </div>
-                                    <div>
-                                        <h4 className="text-[10px] font-black uppercase tracking-widest">On-Chain Status</h4>
-                                        <p className="text-[10px] text-neutral-400 uppercase font-bold mt-1">Pending Registration</p>
-                                    </div>
-                                </div>
                             </section>
                         </div>
 

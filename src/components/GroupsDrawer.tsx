@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Users, Plus, UserPlus, Loader2, CheckCircle2, AlertCircle, ExternalLink } from 'lucide-react'
 import { useState } from 'react'
+import React from 'react'
 import type { StarknetWindowObject } from 'starknetkit'
 import { cairo } from "starknet";
 
@@ -14,18 +15,30 @@ interface GroupsDrawerProps {
     wallet: StarknetWindowObject | null
     identity: Identity | null
     onOpenIdentity: () => void
+    initialGroupId?: string
+    initialTab?: 'create' | 'add'
 }
 
-export const GroupsDrawer = ({ isOpen, onClose, wallet, identity, onOpenIdentity }: GroupsDrawerProps) => {
-    const [activeTab, setActiveTab] = useState<'create' | 'add'>('create')
+export const GroupsDrawer = ({ isOpen, onClose, wallet, identity, onOpenIdentity, initialGroupId, initialTab }: GroupsDrawerProps) => {
+    const [activeTab, setActiveTab] = useState<'create' | 'add'>(initialTab || 'create')
     const [isLoading, setIsLoading] = useState(false)
     const [txHash, setTxHash] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
 
     // Form states
-    const [groupId, setGroupId] = useState('')
+    const [groupId, setGroupId] = useState(initialGroupId || '')
     const [depth, setDepth] = useState('20')
     const [identityCommitment, setIdentityCommitment] = useState('')
+
+    // Reset state when drawer opens with new props
+    React.useEffect(() => {
+        if (isOpen) {
+            setActiveTab(initialTab || 'create')
+            setGroupId(initialGroupId || '')
+            setError(null)
+            setTxHash(null)
+        }
+    }, [isOpen, initialGroupId, initialTab])
 
     // Derive commitment for active identity
     const activeIdentityCommitment = identity
@@ -190,6 +203,8 @@ export const GroupsDrawer = ({ isOpen, onClose, wallet, identity, onOpenIdentity
                                                 value={depth}
                                                 onChange={(e) => setDepth(e.target.value)}
                                                 placeholder="e.g. 20"
+                                                min="1"
+                                                max="32"
                                                 required
                                                 className="w-full px-4 py-3 bg-neutral-50 border border-neutral-100 rounded-xl text-xs font-bold focus:outline-none focus:border-black/20 focus:bg-white transition-all"
                                             />

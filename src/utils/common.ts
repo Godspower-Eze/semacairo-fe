@@ -50,7 +50,6 @@ export async function generateCalldata(
     await garaga.init();
     const snarksProof = unpackGroth16Proof(packedProof);
     const proof = parseGroth16ProofFromObject(snarksProof, publicInputs);
-    console.log(proof)
 
     const verificationKey = {
         ...semaphoreVkData,
@@ -58,8 +57,6 @@ export async function generateCalldata(
         IC: semaphoreVkData.IC[depth - 1]
     }
     const vk = parseGroth16VerifyingKeyFromObject(verificationKey);
-    console.log(vk)
-
     const result = garaga.getGroth16CallData(proof, vk, 0);
     return result.map((x: bigint) => x.toString());
 }
@@ -107,4 +104,43 @@ export async function getGroupDepth(groupId: string): Promise<number> {
     const semaphoreContract = new Contract(SEMAPHORE_ABI, SEMAPHORE_CONTRACT_ADDRESS, provider);
     const result = await semaphoreContract.call('get_group_depth', [groupId], { blockIdentifier: 'latest' })
     return Number(result)
+}
+
+export interface GroupInfo {
+    id: string;
+    depth: number;
+    admin: string;
+}
+
+export async function fetchAllGroups(): Promise<GroupInfo[]> {
+    const GROUP_CREATED_KEY = hash.getSelectorFromName('GroupCreated')
+    let continuationToken: string | undefined = undefined
+    const groups: GroupInfo[] = []
+
+    do {
+        const result = await provider.getEvents({
+            from_block: { block_number: 647000 },
+            to_block: 'latest',
+            address: SEMAPHORE_CONTRACT_ADDRESS,
+            keys: [[GROUP_CREATED_KEY]],
+            chunk_size: 100,
+            ...(continuationToken ? { continuation_token: continuationToken } : {})
+        })
+
+        for (const event of result.events) {
+            if (event.keys && event.data) {
+                // event.keys = [key, group_id_low, group_id_high]
+                // event.data = [depth, admin]
+                const low = BigInt(event.keys[1])
+                const high = BigInt(event.keys[2])
+                const groupId = (high << 128n) + low
+                const depth = Number(event.data[0])
+                const admin = event.data[1]
+                groups.push({ id: groupId.toString(), depth, admin })
+            }
+        }
+        continuationToken = result.continuation_token
+    } while (continuationToken)
+
+    return groups
 }

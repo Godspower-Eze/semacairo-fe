@@ -2,7 +2,7 @@ import SEMAPHORE_CONTRACT_JSON from '../semacairo_Semaphore.contract_class.json'
 
 import { RpcProvider } from 'starknet'
 
-export const SEMAPHORE_CONTRACT_ADDRESS = "0x05f6ed1efe2ab4dd69fb5fef1901c00fed9b9666b7a2b18736081c873a7fa238"
+export const SEMAPHORE_CONTRACT_ADDRESS = "0x023e76e23822b88b2e7d0228c1bc6361d44a560013030f0f3923884556cfa85d"
 // RPC Provider from environment
 export const provider = new RpcProvider({ nodeUrl: import.meta.env.VITE_RPC_URL })
 

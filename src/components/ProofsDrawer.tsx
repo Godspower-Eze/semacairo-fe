@@ -1,6 +1,7 @@
 import { motion, AnimatePresence, m } from 'framer-motion'
 import { X, Loader2, CheckCircle2, AlertCircle, ExternalLink, Shield, Send, BadgeCheck, Copy } from 'lucide-react'
 import { useState } from 'react'
+import React from 'react'
 import type { StarknetWindowObject } from 'starknetkit'
 import { Identity } from '@semaphore-protocol/identity'
 import { Group } from '@semaphore-protocol/group'
@@ -17,6 +18,7 @@ interface ProofsDrawerProps {
     wallet: StarknetWindowObject | null
     identity: Identity | null
     onOpenIdentity: () => void
+    initialGroupId?: string
 }
 
 type GeneratedProof = {
@@ -30,12 +32,12 @@ type GeneratedProof = {
 
 const createEmptyPackedProof = (): PackedGroth16Proof => ['', '', '', '', '', '', '', '']
 
-export const ProofsDrawer = ({ isOpen, onClose, wallet, identity, onOpenIdentity }: ProofsDrawerProps) => {
+export const ProofsDrawer = ({ isOpen, onClose, wallet, identity, onOpenIdentity, initialGroupId }: ProofsDrawerProps) => {
     const [activeTab, setActiveTab] = useState<'send' | 'verify'>('send')
     const [isLoading, setIsLoading] = useState(false)
     const [txHash, setTxHash] = useState<string | null>(null)
     const [error, setError] = useState<string | null>(null)
-    const [status, setStatus] = useState('')
+    const [status, setStatus] = useState<string>('')
     const [generatedProof, setGeneratedProof] = useState<GeneratedProof | null>(null)
     const [copyFeedback, setCopyFeedback] = useState<string | null>(null)
     const [verifyError, setVerifyError] = useState<string | null>(null)
@@ -44,9 +46,20 @@ export const ProofsDrawer = ({ isOpen, onClose, wallet, identity, onOpenIdentity
     const [verifyResult, setVerifyResult] = useState<boolean | null>(null)
 
     // Form states
-    const [groupId, setGroupId] = useState('')
-    const [scope, setScope] = useState('')
+    const [groupId, setGroupId] = useState(initialGroupId || '')
     const [message, setMessage] = useState('')
+    const [scope, setScope] = useState('0') // Set default scope to 0
+
+    // Reset state when drawer opens with new props
+    React.useEffect(() => {
+        if (isOpen) {
+            setGroupId(initialGroupId || '')
+            setActiveTab('send') // Or you could pass initialTab as well
+            setError(null)
+            setTxHash(null)
+            setStatus('')
+        }
+    }, [isOpen, initialGroupId])
     const [verifyMerkleTreeDepth, setVerifyMerkleTreeDepth] = useState('20')
     const [verifyMerkleTreeRoot, setVerifyMerkleTreeRoot] = useState('')
     const [verifyNullifier, setVerifyNullifier] = useState('')
@@ -145,6 +158,7 @@ export const ProofsDrawer = ({ isOpen, onClose, wallet, identity, onOpenIdentity
                     ]
                 }
             })
+            console.log(response)
             setTxHash(response.transaction_hash)
             setStatus('')
 

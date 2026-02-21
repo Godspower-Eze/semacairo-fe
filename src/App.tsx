@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Shield, ExternalLink, Menu, X, Lock, Fingerprint, Wallet, LogOut, Users, Search, AlertTriangle } from 'lucide-react'
+import { Shield, ExternalLink, Menu, X, Lock, Fingerprint, Wallet, LogOut, Users, Search, AlertTriangle, Plus, UserPlus, Loader2 } from 'lucide-react'
+import React from 'react'
 import { Identity } from '@semaphore-protocol/identity'
 import { useStarknet } from './hooks/useStarknet'
 import { IdentityDrawer } from './components/IdentityDrawer'
 import { GroupsDrawer } from './components/GroupsDrawer'
 import { ProofsDrawer } from './components/ProofsDrawer'
+import { fetchAllGroups, type GroupInfo } from './utils/common'
 
 function App() {
   const [identity, setIdentity] = useState<Identity | null>(null)
@@ -13,7 +15,49 @@ function App() {
   const [isIdentityDrawerOpen, setIsIdentityDrawerOpen] = useState(false)
   const [isGroupsDrawerOpen, setIsGroupsDrawerOpen] = useState(false)
   const [isProofsDrawerOpen, setIsProofsDrawerOpen] = useState(false)
+  
+  // Initial focused states for drawers
+  const [initialGroupId, setInitialGroupId] = useState<string>('')
+  const [initialGroupsTab, setInitialGroupsTab] = useState<'create' | 'add'>('create')
+
+  const [groups, setGroups] = useState<GroupInfo[]>([])
+  const [isLoadingGroups, setIsLoadingGroups] = useState(false)
+
   const { isConnected, address, chainId, signMessage, isConnecting, connectWallet, disconnectWallet, wallet, isSepolia, switchToSepolia } = useStarknet()
+
+  // Fetch groups on mount and poll for updates
+  React.useEffect(() => {
+    let isMounted = true;
+
+    async function loadGroups(showLoading = false) {
+      if (showLoading) setIsLoadingGroups(true)
+      try {
+        const fetched = await fetchAllGroups()
+        if (isMounted) {
+          setGroups(fetched)
+        }
+      } catch (err) {
+        console.error("Failed to fetch groups:", err)
+      } finally {
+        if (isMounted && showLoading) {
+          setIsLoadingGroups(false)
+        }
+      }
+    }
+
+    // Initial load with loading state
+    loadGroups(true)
+
+    // Poll every 10 seconds in the background
+    const intervalId = setInterval(() => {
+      loadGroups(false)
+    }, 10000)
+
+    return () => {
+      isMounted = false
+      clearInterval(intervalId)
+    }
+  }, [])
 
   // Actions are only allowed when connected AND on Sepolia
   const isReady = isConnected && isSepolia
@@ -63,6 +107,8 @@ function App() {
           setIsGroupsDrawerOpen(false)
           setIsIdentityDrawerOpen(true)
         }}
+        initialGroupId={initialGroupId}
+        initialTab={initialGroupsTab}
       />
 
       {/* Proofs Drawer */}
@@ -75,6 +121,7 @@ function App() {
           setIsProofsDrawerOpen(false)
           setIsIdentityDrawerOpen(true)
         }}
+        initialGroupId={initialGroupId}
       />
 
       {/* Navigation */}
@@ -130,6 +177,46 @@ function App() {
             </div>
           </div>
         </div>
+
+        {/* Mobile Menu */}
+        {isMenuOpen && (
+          <div className="md:hidden border-t border-neutral-100 bg-white">
+            <div className="px-6 py-6 flex flex-col gap-4">
+              {isConnected ? (
+                <>
+                  <div className="border border-neutral-200 px-4 py-3 text-xs font-mono flex items-center justify-center gap-2 bg-neutral-50 rounded-sm w-full">
+                    <div className="w-1.5 h-1.5 rounded-full bg-black animate-pulse" />
+                    {truncatedAddress}
+                  </div>
+                  <button
+                    onClick={() => {
+                      disconnectWallet()
+                      setIsMenuOpen(false)
+                    }}
+                    className="w-full flex items-center justify-center gap-2 p-3 border border-neutral-200 hover:bg-neutral-50 hover:border-black transition-all cursor-pointer rounded-sm"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span className="text-xs font-bold uppercase tracking-wider">Disconnect</span>
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => {
+                    connectWallet()
+                    setIsMenuOpen(false)
+                  }}
+                  disabled={isConnecting}
+                  className="w-full bg-black text-white px-6 py-4 text-[10px] font-black uppercase tracking-[0.3em] transition-all hover:bg-neutral-800 disabled:opacity-50 cursor-pointer rounded-sm group flex justify-center"
+                >
+                  <div className="flex items-center gap-3">
+                    <Wallet className="w-4 h-4 group-hover:rotate-12 transition-transform" />
+                    {isConnecting ? 'Establishing...' : 'Connect Identity'}
+                  </div>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </nav>
 
       <main className="pt-40 pb-20 px-6">
@@ -220,14 +307,20 @@ function App() {
               <div className="mt-auto flex flex-col gap-3 relative">
                 <button
                   disabled={!isReady}
-                  onClick={() => setIsProofsDrawerOpen(true)}
+                  onClick={() => {
+                    setInitialGroupId('')
+                    setIsProofsDrawerOpen(true)
+                  }}
                   className="bg-black text-white py-4 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-neutral-800 transition-colors cursor-pointer text-center shadow-lg shadow-black/10 disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                   Send message
                 </button>
                 <button
                   disabled={!isReady}
-                  onClick={() => setIsProofsDrawerOpen(true)}
+                  onClick={() => {
+                    setInitialGroupId('')
+                    setIsProofsDrawerOpen(true)
+                  }}
                   className="border border-neutral-200 py-4 text-[10px] font-bold uppercase tracking-[0.2em] hover:bg-white hover:border-black transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                   Verify Proof
@@ -237,12 +330,105 @@ function App() {
           </div>
 
           <section className="mt-20 border-t border-neutral-100 pt-20">
-            <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-neutral-400 mb-10">Active Operations</h2>
-            <div className="border border-neutral-100 p-12 text-center">
-              <Search className="w-8 h-8 mx-auto mb-4 text-neutral-200" />
-              <p className="text-sm text-neutral-400">No active signals or group memberships detected.</p>
-              <p className="text-xs text-neutral-300 mt-2 italic">Connect wallet and generate identity to start.</p>
+            <div className="flex items-center justify-between mb-10">
+              <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-neutral-400">On-Chain Groups</h2>
+              <button 
+                disabled={!isReady}
+                onClick={() => {
+                  setInitialGroupId('')
+                  setInitialGroupsTab('create')
+                  setIsGroupsDrawerOpen(true)
+                }}
+                className="text-[10px] font-bold uppercase tracking-wider bg-black text-white px-4 py-2 hover:bg-neutral-800 transition-colors disabled:opacity-30 flex items-center gap-2"
+              >
+                <Plus className="w-3 h-3" /> Create Group
+              </button>
             </div>
+
+            {isLoadingGroups ? (
+              <div className="border border-neutral-100 p-12 text-center flex flex-col items-center justify-center gap-4">
+                <Loader2 className="w-8 h-8 text-neutral-200 animate-spin" />
+                <p className="text-sm text-neutral-400">Syncing with Sepolia...</p>
+              </div>
+            ) : groups.length === 0 ? (
+              <div className="border border-neutral-100 p-12 text-center">
+                <Search className="w-8 h-8 mx-auto mb-4 text-neutral-200" />
+                <p className="text-sm text-neutral-400">No active groups detected.</p>
+                <p className="text-xs text-neutral-300 mt-2 italic">Connect wallet and generate identity to start.</p>
+              </div>
+            ) : (
+              <div className="border border-neutral-100 overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-neutral-100 bg-neutral-50/50">
+                      <th className="p-4 text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500 whitespace-nowrap">Group ID</th>
+                      <th className="p-4 text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500 whitespace-nowrap">Admin</th>
+                      <th className="p-4 text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500 whitespace-nowrap">Depth</th>
+                      <th className="p-4 text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500 text-right whitespace-nowrap">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {groups.map((group) => {
+                      // is connected address the admin? (ignoring case)
+                      const isGroupAdmin = isReady && address && (BigInt(address) === BigInt(group.admin));
+                      const truncatedAdmin = `${group.admin.slice(0, 6)}...${group.admin.slice(-4)}`;
+
+                      return (
+                        <tr key={group.id} className="border-b border-neutral-100 hover:bg-neutral-50/50 transition-colors last:border-b-0 group">
+                          <td className="p-4 align-middle">
+                            <span className="font-mono text-sm font-bold">#{group.id}</span>
+                          </td>
+                          <td className="p-4 align-middle">
+                            <span className="font-mono text-xs text-neutral-500 bg-black/5 px-2 py-1 rounded-sm">{truncatedAdmin}</span>
+                            {isGroupAdmin && <span className="ml-2 text-[9px] font-black uppercase tracking-wider text-black bg-neutral-200 px-2 py-1 rounded-sm">You</span>}
+                          </td>
+                          <td className="p-4 align-middle">
+                            <span className="text-xs text-neutral-500 font-medium">{group.depth}</span>
+                          </td>
+                          <td className="p-4 align-middle text-right">
+                            <div className="flex items-center justify-end gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                              <button
+                                disabled={!isReady || !isGroupAdmin}
+                                onClick={() => {
+                                  setInitialGroupId(group.id)
+                                  setInitialGroupsTab('add')
+                                  setIsGroupsDrawerOpen(true)
+                                }}
+                                title={!isGroupAdmin ? "Only the admin can add members" : "Add Member"}
+                                className="p-2 border border-neutral-200 hover:border-black hover:bg-black hover:text-white transition-all rounded-sm disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-black disabled:hover:border-neutral-200"
+                              >
+                                <UserPlus className="w-3.5 h-3.5" />
+                              </button>
+                              <div className="w-px h-6 bg-neutral-100 mx-1" />
+                              <button
+                                disabled={!isReady}
+                                onClick={() => {
+                                  setInitialGroupId(group.id)
+                                  setIsProofsDrawerOpen(true)
+                                }}
+                                className="px-3 py-1.5 border border-neutral-200 hover:border-black text-[9px] font-black uppercase tracking-wider text-black transition-all rounded-sm disabled:opacity-30"
+                              >
+                                Message
+                              </button>
+                              <button
+                                disabled={!isReady}
+                                onClick={() => {
+                                  setInitialGroupId(group.id)
+                                  setIsProofsDrawerOpen(true) // ProofsDrawer currently handles both send & verify on same initial flow
+                                }}
+                                className="px-3 py-1.5 border border-neutral-200 hover:border-black text-[9px] font-black uppercase tracking-wider text-black transition-all rounded-sm disabled:opacity-30"
+                              >
+                                Verify
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </section>
         </div>
       </main>
