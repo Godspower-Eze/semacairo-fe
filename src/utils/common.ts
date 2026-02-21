@@ -8,8 +8,8 @@ import * as garaga from 'garaga';
 import { hash, cairo, Contract } from 'starknet'
 
 import { parseGroth16VerifyingKeyFromObject, parseGroth16ProofFromObject } from '../utils/garaga';
-import semaphoreVkData from '../verification_key.json'; 
-import { provider, SEMAPHORE_CONTRACT_ADDRESS, SEMAPHORE_ABI } from '../config/constants';
+import semacairoVkData from '../verification_key.json'; 
+import { provider, SEMACAIRO_CONTRACT_ADDRESS, SEMACAIRO_ABI } from '../config/constants';
 
 /**
  * Creates a keccak256 hash of a message compatible with the SNARK scalar modulus.
@@ -29,7 +29,7 @@ export const toNumericString = (value: string) => {
 
     try {
         return ethersToBigInt(trimmed).toString()
-    } catch (error) {
+    } catch {
         return ethersToBigInt(encodeBytes32String(trimmed)).toString()
     }
 }
@@ -52,9 +52,9 @@ export async function generateCalldata(
     const proof = parseGroth16ProofFromObject(snarksProof, publicInputs);
 
     const verificationKey = {
-        ...semaphoreVkData,
-        vk_delta_2: semaphoreVkData.vk_delta_2[depth - 1],
-        IC: semaphoreVkData.IC[depth - 1]
+        ...semacairoVkData,
+        vk_delta_2: semacairoVkData.vk_delta_2[depth - 1],
+        IC: semacairoVkData.IC[depth - 1]
     }
     const vk = parseGroth16VerifyingKeyFromObject(verificationKey);
     const result = garaga.getGroth16CallData(proof, vk, 0);
@@ -74,7 +74,7 @@ export async function fetchGroupMembers(groupId: string): Promise<bigint[]> {
         const result = await provider.getEvents({
             from_block: { block_number: 5500000 },
             to_block: 'latest',
-            address: SEMAPHORE_CONTRACT_ADDRESS,
+            address: SEMACAIRO_CONTRACT_ADDRESS,
             keys: [[MEMBER_ADDED_KEY]],
             chunk_size: 100,
             ...(continuationToken ? { continuation_token: continuationToken } : {})
@@ -101,40 +101,15 @@ export async function fetchGroupMembers(groupId: string): Promise<bigint[]> {
 }
 
 export async function getGroupDepth(groupId: string): Promise<number> {
-    const semaphoreContract = new Contract(SEMAPHORE_ABI, SEMAPHORE_CONTRACT_ADDRESS, provider);
-    const result = await semaphoreContract.call('get_group_depth', [groupId], { blockIdentifier: 'latest' })
+    const semacairoContract = new Contract(SEMACAIRO_ABI, SEMACAIRO_CONTRACT_ADDRESS, provider);
+    const result = await semacairoContract.call('get_group_depth', [groupId], { blockIdentifier: 'latest' })
     return Number(result)
 }
 
 export async function isNullifierUsed(nullifier: string): Promise<boolean> {
-    const semaphoreContract = new Contract(SEMAPHORE_ABI, SEMAPHORE_CONTRACT_ADDRESS, provider);
+    const semacairoContract = new Contract(SEMACAIRO_ABI, SEMACAIRO_CONTRACT_ADDRESS, provider);
     const n = BigInt(nullifier);
-    const result = await semaphoreContract.call('is_nullifier_used', [n], { blockIdentifier: 'latest' })
-    return result as boolean
-}
-
-export async function verifyProofOnChain(
-    groupId: string,
-    merkleTreeRoot: string,
-    nullifier: string,
-    message: string,
-    scope: string,
-    calldata: string[]
-): Promise<boolean> {
-    const semaphoreContract = new Contract(SEMAPHORE_ABI, SEMAPHORE_CONTRACT_ADDRESS, provider);
-    
-    // In starknet.js v6, Contract.call with ABI handles u256 splitting automatically if passed as BigInt
-    const gid = BigInt(groupId);
-    const root = BigInt(merkleTreeRoot);
-    const n = BigInt(nullifier);
-    const msg = BigInt(keccakHash(message));
-    const s = BigInt(keccakHash(scope));
-
-    const result = await semaphoreContract.call(
-        'verify_proof',
-        [gid, root, n, msg, s, calldata],
-        { blockIdentifier: 'latest' }
-    )
+    const result = await semacairoContract.call('is_nullifier_used', [n], { blockIdentifier: 'latest' })
     return result as boolean
 }
 
@@ -153,7 +128,7 @@ export async function fetchAllGroups(): Promise<GroupInfo[]> {
         const result = await provider.getEvents({
             from_block: { block_number: 647000 },
             to_block: 'latest',
-            address: SEMAPHORE_CONTRACT_ADDRESS,
+            address: SEMACAIRO_CONTRACT_ADDRESS,
             keys: [[GROUP_CREATED_KEY]],
             chunk_size: 100,
             ...(continuationToken ? { continuation_token: continuationToken } : {})

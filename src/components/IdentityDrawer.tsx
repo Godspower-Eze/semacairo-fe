@@ -1,10 +1,13 @@
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Fingerprint, Copy, Check, ShieldAlert, RefreshCw, PenTool } from 'lucide-react'
+import { X, Fingerprint, ShieldAlert, Key } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { shortString } from 'starknet'
 import { Identity } from '@semaphore-protocol/identity'
 import type { StarknetWindowObject } from 'starknetkit'
 
+import { Button } from './ui/Button'
+import { Card, CardContent } from './ui/Card'
+import { HashDisplay } from './ui/HashDisplay'
 
 interface IdentityDrawerProps {
     isOpen: boolean
@@ -18,24 +21,30 @@ interface IdentityDrawerProps {
 }
 
 export const IdentityDrawer = ({ isOpen, onClose, chainId, signMessage, address, identity, setIdentity }: IdentityDrawerProps) => {
-    const [isCopied, setIsCopied] = useState(false)
     const [isGenerating, setIsGenerating] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const [showProtectedKeys, setShowProtectedKeys] = useState(false)
 
     // Clear identity when address changes
     useEffect(() => {
         setIdentity(null)
+        setShowProtectedKeys(false)
     }, [address, setIdentity])
 
-    const handleGenerate = async () => {
+    // Reset view toggle on close
+    useEffect(() => {
+        if (!isOpen) {
+            setShowProtectedKeys(false)
+        }
+    }, [isOpen])
 
+    const handleGenerate = async () => {
         setIsGenerating(true)
         setError(null)
 
         let signature: any;
         try {
-            // High-compatibility TypedData (using felt for maximum wallet support)
-            // Clean chainId (remove underscores which can confuse some parsers)
+            // High-compatibility TypedData
             const cleanChainId = chainId
 
             const typedData = {
@@ -60,7 +69,6 @@ export const IdentityDrawer = ({ isOpen, onClose, chainId, signMessage, address,
                 },
             }
 
-            // Step 1: Request signature
             signature = await signMessage(typedData)
         } catch (err: any) {
             console.error('Signature failed:', err)
@@ -71,19 +79,14 @@ export const IdentityDrawer = ({ isOpen, onClose, chainId, signMessage, address,
         }
 
         try {
-            // Step 2: Generate stable seed from signature
-            // signature is typically string[] (hex felts)
             const signatureSeed = Array.isArray(signature)
                 ? signature.join('')
                 : typeof signature === 'object'
                     ? JSON.stringify(signature)
                     : String(signature)
 
-            // Step 3: Create Semaphore Identity (v4)
-            // Storing the FULL Identity object in global state
             const semaIdentity = new Identity(signatureSeed)
             setIdentity(semaIdentity)
-
             setIsGenerating(false)
         } catch (err: any) {
             console.error('Identity creation failed:', err)
@@ -92,16 +95,8 @@ export const IdentityDrawer = ({ isOpen, onClose, chainId, signMessage, address,
         }
     }
 
-    const copyToClipboard = (text: string) => {
-        navigator.clipboard.writeText(text)
-        setIsCopied(true)
-        setTimeout(() => setIsCopied(false), 2000)
-    }
-
-    // Derive commitment string for UI
-    const identityCommitment = identity
-        ? "0x" + (identity.commitment).toString(16)
-        : null
+    const identityCommitment = identity ? "0x" + (identity.commitment).toString(16) : null
+    const privateKey = identity ? identity.export() : null
 
     return (
         <AnimatePresence>
@@ -113,7 +108,7 @@ export const IdentityDrawer = ({ isOpen, onClose, chainId, signMessage, address,
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100]"
+                        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100]"
                     />
 
                     {/* Drawer */}
@@ -122,77 +117,116 @@ export const IdentityDrawer = ({ isOpen, onClose, chainId, signMessage, address,
                         animate={{ x: 0 }}
                         exit={{ x: '100%' }}
                         transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                        className="fixed right-0 top-0 h-full w-full max-w-lg bg-white shadow-2xl z-[101] border-l border-neutral-100 flex flex-col"
+                        className="fixed right-0 top-0 h-full w-full max-w-lg bg-[var(--color-surface-0)] shadow-2xl z-[101] border-l border-[var(--color-border-subtle)] flex flex-col font-sans text-[var(--color-text)]"
                     >
                         {/* Header */}
-                        <div className="p-8 border-b border-neutral-100 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-black text-white rounded-sm">
-                                    <Fingerprint className="w-5 h-5" />
+                        <div className="p-8 border-b border-[var(--color-border-subtle)] flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <div className="p-2 border border-[var(--color-border-subtle)] bg-[var(--color-surface-1)] rounded-sm">
+                                    <Fingerprint className="w-5 h-5 text-[var(--color-text)]" />
                                 </div>
-                                <h2 className="text-xl font-bold uppercase tracking-tight">Identity Hub</h2>
+                                <h2 className="text-xl font-black uppercase tracking-widest text-[var(--color-text)]">IDENTITY</h2>
                             </div>
-                            <button
+                            <Button
+                                variant="ghost"
                                 onClick={onClose}
-                                className="p-2 hover:bg-neutral-100 transition-colors rounded-sm cursor-pointer"
+                                className="!px-3 !py-2"
                             >
                                 <X className="w-5 h-5" />
-                            </button>
+                            </Button>
                         </div>
 
                         {/* Content */}
-                        <div className="flex-1 overflow-y-auto p-8 space-y-12">
-                            {/* Info Section */}
+                        <div className="flex-1 overflow-y-auto p-8 space-y-10">
+                            {/* Security Notice */}
                             <section>
-                                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-400 mb-6">Security Context</h3>
-                                <div className="bg-neutral-50 border border-neutral-100 p-6 space-y-4">
-                                    <div className="flex gap-4">
-                                        <ShieldAlert className="w-5 h-5 text-black shrink-0" />
-                                        <p className="text-sm leading-relaxed text-neutral-600">
-                                            Your identity root is deterministically derived from your wallet signature. This means your privacy profile is permanently attached to your account and cannot be lost as long as you control your wallet.
+                                <div className="border border-[var(--color-border-subtle)] p-5 bg-[var(--color-surface-1)] flex gap-4">
+                                    <ShieldAlert className="w-5 h-5 shrink-0 text-[var(--color-text-muted)] mt-0.5" />
+                                    <div className="space-y-2">
+                                        <h3 className="text-xs font-black uppercase tracking-widest text-[var(--color-text)]">Deterministic Root</h3>
+                                        <p className="text-xs leading-relaxed text-[var(--color-text-muted)] font-mono">
+                                            &gt; Your zero-knowledge identity is mathematically derived directly from your wallet signature. It cannot be lost while you control the wallet keys.
                                         </p>
                                     </div>
                                 </div>
                             </section>
 
-                            {/* Action Section */}
                             <section className="space-y-6">
-                                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-400 mb-6">Initialization</h3>
+                                <div className="flex items-center gap-3 border-b border-[var(--color-border-subtle)] pb-4">
+                                    <h3 className="text-[10px] font-black uppercase tracking-widest text-[var(--color-text-muted)]">CRYPTOGRAPHIC ROOT</h3>
+                                    <div className="flex-1 h-px bg-[var(--color-border-subtle)]" />
+                                </div>
 
                                 {!identityCommitment ? (
                                     <div className="space-y-4">
-                                        <button
+                                        <Button
                                             onClick={handleGenerate}
-                                            disabled={isGenerating}
-                                            className="w-full bg-black text-white py-8 flex flex-col items-center justify-center gap-4 group hover:bg-neutral-800 transition-all cursor-pointer relative overflow-hidden"
+                                            isLoading={isGenerating}
+                                            variant="secondary"
+                                            className="w-full !py-12 flex flex-col items-center justify-center gap-4 group border-dashed"
                                         >
-                                            {isGenerating ? (
-                                                <RefreshCw className="w-6 h-6 animate-spin" />
-                                            ) : (
-                                                <PenTool className="w-6 h-6 group-hover:scale-110 transition-transform" />
-                                            )}
-                                            <div className="text-center">
-                                                <span className="block text-xs font-black uppercase tracking-[0.3em] font-mono">Create Identity Commitment</span>
-                                                <span className="text-[10px] text-neutral-400 mt-1 uppercase tracking-widest">Sign to derive ZK root</span>
-                                            </div>
-                                        </button>
-                                        {error && <p className="text-[10px] text-red-500 font-bold uppercase text-center mt-4">{error}</p>}
+                                            <Fingerprint className="w-8 h-8 text-[var(--color-text-muted)] group-hover:text-[var(--color-text)] transition-colors" />
+                                            <span className="text-center font-mono font-bold tracking-[0.2em] text-xs">INITIALIZE IDENTITY</span>
+                                        </Button>
+                                        {error && <p className="text-[10px] text-red-500 font-mono text-center uppercase border border-red-900/50 bg-red-950/20 p-3">{error}</p>}
                                     </div>
                                 ) : (
-                                    <div className="space-y-4">
-                                        <div className="border border-black p-6 space-y-6 bg-neutral-50 shadow-xl shadow-black/5">
-                                            <div className="space-y-2">
-                                                <label className="text-[9px] font-black uppercase tracking-[0.2em] text-neutral-400">Identity Commitment</label>
-                                                <p className="text-[9px] text-neutral-400 uppercase font-bold leading-tight mb-2">
-                                                    This is your deterministic public identity. It can be shared and added to privacy groups.
-                                                </p>
-                                                <div className="flex items-center justify-between gap-4 bg-white p-3 border border-neutral-100">
-                                                    <code className="text-[10px] font-mono font-bold break-all text-black line-clamp-2">{identityCommitment}</code>
-                                                    <button onClick={() => copyToClipboard(identityCommitment!)} className="p-2 hover:bg-neutral-50 transition-all cursor-pointer shrink-0">
-                                                        {isCopied ? <Check className="w-3 h-3 text-green-500" /> : <Copy className="w-3 h-3" />}
-                                                    </button>
+                                    <div className="space-y-6">
+                                        {/* Public Commitment */}
+                                        <Card variant="elevated" className="border-emerald-900/50 bg-[var(--color-surface-1)] text-left">
+                                            <CardContent className="p-5 flex flex-col gap-3">
+                                                <div className="flex justify-between items-start">
+                                                    <label className="text-[10px] font-black uppercase tracking-widest text-emerald-500 flex items-center gap-2">
+                                                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                                        IDENTITY COMMITMENT (PUBLIC)
+                                                    </label>
                                                 </div>
+                                                <p className="text-[10px] text-[var(--color-text-muted)] font-mono mb-2 border-l-2 border-emerald-900 pl-3">
+                                                    This is your public identifier. Share this safely to be added to Cryptographic Sets.
+                                                </p>
+                                                <div className="w-full">
+                                                    <HashDisplay 
+                                                        hash={identityCommitment} 
+                                                        preserveLength 
+                                                        className="w-full !bg-[var(--color-surface-0)] border-[var(--color-border-subtle)] !py-4" 
+                                                    />
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+
+                                        {/* Progressive Disclosure for Secrets */}
+                                        <div className="border border-[var(--color-border-subtle)] p-5 bg-[var(--color-surface-1)] space-y-4">
+                                            <div className="flex justify-between items-center">
+                                                <div className="flex items-center gap-2 text-[var(--color-text-muted)]">
+                                                    <Key className="w-4 h-4" />
+                                                    <span className="text-xs font-black uppercase tracking-widest">PROTECTED KEYS</span>
+                                                </div>
+                                                <Button
+                                                    variant="ghost"
+                                                    onClick={() => setShowProtectedKeys(!showProtectedKeys)}
+                                                    className="!px-3 !py-1 !text-[10px]"
+                                                >
+                                                    {showProtectedKeys ? '[ HIDE SECRETS ]' : '[ REVEAL SECRETS ]'}
+                                                </Button>
                                             </div>
+
+                                            {showProtectedKeys && (
+                                                <motion.div 
+                                                    initial={{ height: 0, opacity: 0 }}
+                                                    animate={{ height: 'auto', opacity: 1 }}
+                                                    className="pt-4 border-t border-white/10 flex flex-col gap-4 overflow-hidden"
+                                                >
+                                                    <div className="space-y-2">
+                                                        <label className="text-[10px] font-mono uppercase tracking-widest text-red-500">PRIVATE KEY (BASE64)</label>
+                                                        <HashDisplay hash={privateKey!} preserveLength className="w-full justify-between !bg-black" />
+                                                    </div>
+                                                    <div className="bg-red-950/20 border border-red-900/50 p-3 mt-2">
+                                                        <p className="text-[10px] font-mono text-red-500 uppercase tracking-widest">
+                                                            WARNING: NEVER SHARE THIS KEY. COMPROMISE LEADS TO COMPLETE LOSS OF ANONYMITY.
+                                                        </p>
+                                                    </div>
+                                                </motion.div>
+                                            )}
                                         </div>
                                     </div>
                                 )}
@@ -200,9 +234,9 @@ export const IdentityDrawer = ({ isOpen, onClose, chainId, signMessage, address,
                         </div>
 
                         {/* Footer */}
-                        <div className="p-8 border-t border-neutral-100">
-                            <p className="text-[9px] text-neutral-400 font-bold uppercase tracking-[0.2em]">
-                                SemaCairo // Identity Layer // Starknet
+                        <div className="p-8 border-t border-white/10 bg-black">
+                            <p className="text-[10px] text-neutral-600 font-mono uppercase tracking-widest text-center">
+                                SECURE TERMINAL CONNECTION ESTABLISHED
                             </p>
                         </div>
                     </motion.div>
@@ -211,3 +245,4 @@ export const IdentityDrawer = ({ isOpen, onClose, chainId, signMessage, address,
         </AnimatePresence>
     )
 }
+
