@@ -106,6 +106,38 @@ export async function getGroupDepth(groupId: string): Promise<number> {
     return Number(result)
 }
 
+export async function isNullifierUsed(nullifier: string): Promise<boolean> {
+    const semaphoreContract = new Contract(SEMAPHORE_ABI, SEMAPHORE_CONTRACT_ADDRESS, provider);
+    const n = BigInt(nullifier);
+    const result = await semaphoreContract.call('is_nullifier_used', [n], { blockIdentifier: 'latest' })
+    return result as boolean
+}
+
+export async function verifyProofOnChain(
+    groupId: string,
+    merkleTreeRoot: string,
+    nullifier: string,
+    message: string,
+    scope: string,
+    calldata: string[]
+): Promise<boolean> {
+    const semaphoreContract = new Contract(SEMAPHORE_ABI, SEMAPHORE_CONTRACT_ADDRESS, provider);
+    
+    // In starknet.js v6, Contract.call with ABI handles u256 splitting automatically if passed as BigInt
+    const gid = BigInt(groupId);
+    const root = BigInt(merkleTreeRoot);
+    const n = BigInt(nullifier);
+    const msg = BigInt(keccakHash(message));
+    const s = BigInt(keccakHash(scope));
+
+    const result = await semaphoreContract.call(
+        'verify_proof',
+        [gid, root, n, msg, s, calldata],
+        { blockIdentifier: 'latest' }
+    )
+    return result as boolean
+}
+
 export interface GroupInfo {
     id: string;
     depth: number;

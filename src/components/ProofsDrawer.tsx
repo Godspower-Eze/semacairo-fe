@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Loader2, CheckCircle2, AlertCircle, ExternalLink, Shield, Send, BadgeCheck, Copy } from 'lucide-react'
-import { useState } from 'react'
-import React from 'react'
+import { useState, useEffect } from 'react'
+import type { FormEvent } from 'react'
 import type { StarknetWindowObject } from 'starknetkit'
 import { Identity } from '@semaphore-protocol/identity'
 import { Group } from '@semaphore-protocol/group'
@@ -9,7 +9,7 @@ import { generateProof, verifyProof } from '@semaphore-protocol/proof'
 import { type PackedGroth16Proof } from '@zk-kit/utils'
 import { cairo } from 'starknet'
 
-import { keccakHash, normalizePackedProof, toNumericString, getGroupDepth, fetchGroupMembers, generateCalldata } from '../utils/common';
+import { keccakHash, normalizePackedProof, toNumericString, getGroupDepth, fetchGroupMembers, generateCalldata, isNullifierUsed, verifyProofOnChain } from '../utils/common';
 import { SEMAPHORE_CONTRACT_ADDRESS } from '../config/constants';
 
 interface ProofsDrawerProps {
@@ -51,9 +51,10 @@ export const ProofsDrawer = ({ isOpen, onClose, wallet, identity, onOpenIdentity
     const [scope, setScope] = useState('0') // Set default scope to 0
 
     // Reset state when drawer opens with new props
-    React.useEffect(() => {
+    useEffect(() => {
         if (isOpen) {
             setGroupId(initialGroupId || '')
+            setVerifyGroupId(initialGroupId || '')
             setActiveTab('send') // Or you could pass initialTab as well
             setError(null)
             setTxHash(null)
@@ -67,13 +68,14 @@ export const ProofsDrawer = ({ isOpen, onClose, wallet, identity, onOpenIdentity
     const [verifyScope, setVerifyScope] = useState('')
     const [verifyPoints, setVerifyPoints] = useState<PackedGroth16Proof>(createEmptyPackedProof)
     const [verifyJsonInput, setVerifyJsonInput] = useState('')
+    const [verifyGroupId, setVerifyGroupId] = useState(initialGroupId || '')
 
     // Derive commitment for UI feedback
     const identityCommitment = identity
         ? "0x" + identity.commitment.toString(16)
         : null
 
-    const handleGenerateProof = async (e: React.FormEvent) => {
+    const handleGenerateProof = async (e: FormEvent) => {
         e.preventDefault()
         setIsLoading(true)
         setError(null)
@@ -126,6 +128,14 @@ export const ProofsDrawer = ({ isOpen, onClose, wallet, identity, onOpenIdentity
             )
 
             setGeneratedProof(fullProof)
+            setStatus('Checking nullifier status on-chain...')
+
+            // 2. Check if nullifier is already used
+            const isUsed = await isNullifierUsed(fullProof.nullifier)
+            if (isUsed) {
+                throw new Error("You have already sent a message in this scope (nullifier already used).")
+            }
+
             setStatus('Message prepared. Submitting transaction...')
 
             const gid = cairo.uint256(groupId);
@@ -223,7 +233,7 @@ export const ProofsDrawer = ({ isOpen, onClose, wallet, identity, onOpenIdentity
         setVerifyPoints([...proof.points] as PackedGroth16Proof)
     }
 
-    const handleVerifyProof = async (e: React.FormEvent) => {
+    const handleVerifyProof = async (e: FormEvent) => {
         e.preventDefault()
         setIsVerifying(true)
         setVerifyError(null)
@@ -279,59 +289,51 @@ export const ProofsDrawer = ({ isOpen, onClose, wallet, identity, onOpenIdentity
 
             const result = await verifyProof(proofToVerify)
             setVerifyResult(result)
-            setVerifyStatus('')
+            
+            if (result) {
+                setVerifyStatus('Proof valid locally. Checking on-chain status...')
+                
+                // 1. Check nullifier on-chain
+                const isUsed = await isNullifierUsed(proofToVerify.nullifier)
+                if (isUsed) {
+                    setVerifyStatus('Warning: Nullifier has already been used on-chain.')
+                } else {
+                    setVerifyStatus('Nullifier is fresh. Verifying proof on-chain...')
+                }
 
-
-            if (!wallet) {
-                throw new Error("Wallet not connected")
-            }
-
-            const publicInputs = [
+                // 2. Verify proof on-chain
+                const publicInputs = [
                     BigInt(proofToVerify.merkleTreeRoot),
                     BigInt(proofToVerify.nullifier),
                     BigInt(keccakHash(proofToVerify.message)),
                     BigInt(keccakHash(proofToVerify.scope))
                 ]
 
-            const calldata = await generateCalldata(
-                proofToVerify.points,
-                publicInputs,
-                depth
-            )
+                const calldata = await generateCalldata(
+                    proofToVerify.points,
+                    publicInputs,
+                    depth
+                )
 
-            const gid = cairo.uint256(groupId);
-            const merkleTreeRootUint256 = cairo.uint256(proofToVerify.merkleTreeRoot);
-            const nullifierUint256 = cairo.uint256(proofToVerify.nullifier);
-            const messageUint256 = cairo.uint256(keccakHash(proofToVerify.message));
-            const scopeUint256 = cairo.uint256(keccakHash(proofToVerify.scope));
-
-            const verificationStatus = await verifyProof(proofToVerify)
-            console.log(verificationStatus)
-
-            const response = await wallet.request({
-                type: 'wallet_addInvokeTransaction',
-                params: {
-                    "calls": [
-                        {
-                            "contract_address": SEMAPHORE_CONTRACT_ADDRESS,
-                            "entry_point": "verify_proof",
-                            "calldata": [
-                                gid.low.toString(),
-                                gid.high.toString(),
-                                merkleTreeRootUint256.low.toString(),
-                                merkleTreeRootUint256.high.toString(),
-                                nullifierUint256.low.toString(),
-                                nullifierUint256.high.toString(),
-                                messageUint256.low.toString(),
-                                messageUint256.high.toString(),
-                                scopeUint256.low.toString(),
-                                scopeUint256.high.toString(),
-                                ...calldata
-                            ]
-                        }
-                    ]
+                const onChainResult = await verifyProofOnChain(
+                    String(verifyGroupId),
+                    proofToVerify.merkleTreeRoot,
+                    proofToVerify.nullifier,
+                    verifyMessage,
+                    verifyScope,
+                    calldata
+                )
+                
+                if (onChainResult) {
+                    setVerifyStatus('Proof is valid both locally and on-chain!')
+                } else {
+                    setVerifyError('On-chain verification failed. This might be due to a root mismatch or contract state.')
+                    setVerifyStatus('')
                 }
-            })
+            } else {
+                setVerifyStatus('')
+            }
+
         } catch (err: any) {
             console.error('Proof verification failed:', err)
             setVerifyError(err.message || 'Proof verification failed')
@@ -542,13 +544,21 @@ export const ProofsDrawer = ({ isOpen, onClose, wallet, identity, onOpenIdentity
                                             {isLoading ? (
                                                 <>
                                                     <Loader2 className="w-4 h-4 animate-spin" />
-                                                    {status || 'Processing...'}
+                                                    <span>Processing...</span>
                                                 </>
                                             ) : (
                                                 'Send message'
                                             )}
                                         </button>
                                     </form>
+
+                                    {/* Sending Status Feedback */}
+                                    {isLoading && status && (
+                                        <div className="mt-4 flex items-center justify-center gap-2">
+                                            <div className="w-1 h-1 rounded-full bg-black animate-pulse" />
+                                            <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">{status}</p>
+                                        </div>
+                                    )}
 
                                     {/* Status Feedback */}
                                     {error && (
@@ -707,6 +717,18 @@ export const ProofsDrawer = ({ isOpen, onClose, wallet, identity, onOpenIdentity
                                         </div>
 
                                         <div className="space-y-2">
+                                            <label className="text-[9px] font-black uppercase tracking-[0.2em] text-neutral-400">Target Group ID</label>
+                                            <input
+                                                type="number"
+                                                value={verifyGroupId}
+                                                onChange={(e) => setVerifyGroupId(e.target.value)}
+                                                placeholder="e.g. 1"
+                                                required
+                                                className="w-full px-4 py-3 bg-neutral-50 border border-neutral-100 rounded-xl text-xs font-bold focus:outline-none focus:border-black/20 focus:bg-white transition-all"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
                                             <label className="text-[9px] font-black uppercase tracking-[0.2em] text-neutral-400">Merkle Tree Depth</label>
                                             <input
                                                 type="number"
@@ -787,18 +809,26 @@ export const ProofsDrawer = ({ isOpen, onClose, wallet, identity, onOpenIdentity
                                         <button
                                             type="submit"
                                             disabled={isVerifying}
-                                            className="w-full h-12 border border-neutral-200 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-white hover:border-black transition-all disabled:bg-neutral-100 disabled:text-neutral-400 flex items-center justify-center gap-3 active:scale-[0.98]"
+                                            className="w-full h-12 bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-neutral-800 transition-all disabled:bg-neutral-100 disabled:text-neutral-400 flex items-center justify-center gap-3 active:scale-[0.98]"
                                         >
                                             {isVerifying ? (
                                                 <>
                                                     <Loader2 className="w-4 h-4 animate-spin" />
-                                                    {verifyStatus || 'Verifying...'}
+                                                    <span>Verifying...</span>
                                                 </>
                                             ) : (
                                                 'Verify Proof'
                                             )}
                                         </button>
                                     </form>
+
+                                    {/* Verification Status Feedback (External to button for better readability) */}
+                                    {isVerifying && verifyStatus && (
+                                        <div className="mt-4 flex items-center justify-center gap-2">
+                                            <div className="w-1 h-1 rounded-full bg-black animate-pulse" />
+                                            <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">{verifyStatus}</p>
+                                        </div>
+                                    )}
 
                                     {verifyError && (
                                         <motion.div

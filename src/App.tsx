@@ -1,7 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Shield, ExternalLink, Menu, X, Lock, Fingerprint, Wallet, LogOut, Users, Search, AlertTriangle, Plus, UserPlus, Loader2 } from 'lucide-react'
-import React from 'react'
 import { Identity } from '@semaphore-protocol/identity'
 import { useStarknet } from './hooks/useStarknet'
 import { IdentityDrawer } from './components/IdentityDrawer'
@@ -26,7 +25,7 @@ function App() {
   const { isConnected, address, chainId, signMessage, isConnecting, connectWallet, disconnectWallet, wallet, isSepolia, switchToSepolia } = useStarknet()
 
   // Fetch groups on mount and poll for updates
-  React.useEffect(() => {
+  useEffect(() => {
     let isMounted = true;
 
     async function loadGroups(showLoading = false) {

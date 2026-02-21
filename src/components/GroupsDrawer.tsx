@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Users, Plus, UserPlus, Loader2, CheckCircle2, AlertCircle, ExternalLink } from 'lucide-react'
-import { useState } from 'react'
-import React from 'react'
+import { useState, useEffect } from 'react'
+import type { FormEvent } from 'react'
 import type { StarknetWindowObject } from 'starknetkit'
 import { cairo } from "starknet";
 
@@ -31,7 +31,7 @@ export const GroupsDrawer = ({ isOpen, onClose, wallet, identity, onOpenIdentity
     const [identityCommitment, setIdentityCommitment] = useState('')
 
     // Reset state when drawer opens with new props
-    React.useEffect(() => {
+    useEffect(() => {
         if (isOpen) {
             setActiveTab(initialTab || 'create')
             setGroupId(initialGroupId || '')
@@ -45,7 +45,7 @@ export const GroupsDrawer = ({ isOpen, onClose, wallet, identity, onOpenIdentity
         ? "0x" + (identity.commitment).toString(16)
         : null
 
-    const handleCreateGroup = async (e: React.FormEvent) => {
+    const handleCreateGroup = async (e: FormEvent) => {
         e.preventDefault()
 
         setIsLoading(true)
@@ -84,7 +84,7 @@ export const GroupsDrawer = ({ isOpen, onClose, wallet, identity, onOpenIdentity
         }
     }
 
-    const handleAddMember = async (e: React.FormEvent) => {
+    const handleAddMember = async (e: FormEvent) => {
         e.preventDefault()
 
         setIsLoading(true)
