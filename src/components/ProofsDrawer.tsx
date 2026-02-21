@@ -1,4 +1,4 @@
-import { motion, AnimatePresence, m } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { X, Loader2, CheckCircle2, AlertCircle, ExternalLink, Shield, Send, BadgeCheck, Copy } from 'lucide-react'
 import { useState } from 'react'
 import React from 'react'
