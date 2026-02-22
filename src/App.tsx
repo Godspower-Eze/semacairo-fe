@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Shield, ExternalLink, Menu, X, Lock, Fingerprint, LogOut, Users, Search, AlertTriangle, Plus, UserPlus, Loader2 } from 'lucide-react'
+import { Shield, ExternalLink, Menu, X, Lock, Fingerprint, LogOut, Users, Search, AlertTriangle, Plus, UserPlus, Loader2, Heart } from 'lucide-react'
 import { Identity } from '@semaphore-protocol/identity'
 import { useStarknet } from './hooks/useStarknet'
 import { IdentityDrawer } from './components/IdentityDrawer'
@@ -426,12 +426,12 @@ function App() {
             <Shield className="w-4 h-4" />
             <span>SemaCairo Protocol Core</span>
           </div>
-          <div className="flex gap-12 font-mono">
-            <a href="#" className="hover:text-white transition-colors flex items-center gap-2">
-              SOURCE_CODE <ExternalLink className="w-3 h-3" />
-            </a>
-            <a href="#" className="hover:text-white transition-colors flex items-center gap-2">
-              STARKNET_NETWORK <ExternalLink className="w-3 h-3" />
+          <div className="flex items-center gap-12 font-mono">
+            <span className="flex items-center gap-2">
+              MADE WITH <Heart className="w-3 h-3 text-red-500 fill-red-500" /> BY GODSPOWER
+            </span>
+            <a href="https://godspowereze.com/" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors flex items-center gap-2 lowercase italic">
+              godspowereze.com <ExternalLink className="w-3 h-3" />
             </a>
           </div>
         </div>
